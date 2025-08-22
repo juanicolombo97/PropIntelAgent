@@ -45,3 +45,32 @@ def next_question(lead: Dict[str, Any]) -> str:
     if "Budget" in missing:
         return "¿Cuál es tu presupuesto aproximado?"
     return "¿Podés contarme un poco más?"
+
+
+
+def set_last_suggestions(lead: dict, prop_ids: list[str]) -> dict:
+    lead["LastSuggestions"] = prop_ids
+    return lead
+
+def choose_property_from_reply(lead: dict, body: str) -> str | None:
+    body = (body or "").strip().lower()
+    # por índice 1..3
+    if body in ("1","2","3"):
+        idx = int(body) - 1
+        props = lead.get("LastSuggestions") or []
+        if 0 <= idx < len(props):
+            return props[idx]
+    # por id explícito (prop_001)
+    if body.startswith("prop_"):
+        return body
+    return None
+
+def set_stage_awaiting_date(lead: dict, prop_id: str) -> dict:
+    lead["Stage"] = "AWAITING_DATE"
+    lead["PendingPropertyId"] = prop_id
+    return lead
+
+def clear_stage(lead: dict) -> dict:
+    lead.pop("Stage", None)
+    lead.pop("PendingPropertyId", None)
+    return lead

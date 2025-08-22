@@ -1,6 +1,11 @@
 from typing import Dict, Any, List
 from models.schemas import dec_to_native
 
+
+def props_ids(props: List[Dict[str, Any]]) -> list[str]:
+    return [p.get("PropertyId") for p in props if p.get("PropertyId")]
+
+
 def _prop_ok(p: Dict[str, Any], lead: Dict[str, Any]) -> bool:
     p = dec_to_native(p)
     neighborhood = lead.get("Neighborhood")
@@ -32,7 +37,8 @@ def find_matches(lead: Dict[str, Any], t_props, limit: int = 3) -> List[Dict[str
     else:
         matched.sort(key=lambda x: (-x.get("Rooms", 0), x.get("Price", 10**9)))
 
-    return matched[:limit]
+    result = matched[:limit]
+    return result 
 
 def format_props_sms(props: List[Dict[str, Any]]) -> str:
     lines = []

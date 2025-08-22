@@ -47,3 +47,36 @@ def extract_slots(text: str) -> Dict[str, Any]:
         print(f"[AI][ERROR] {e}")
         return {"intent": None, "rooms": None, "budget": None,
                 "neighborhood": None, "visit_intent": False, "missing": []}
+
+
+
+def parse_visit_datetime(text: str) -> dict:
+    """
+    Devuelve {"iso": "<ISO8601>"} o {"iso": null}
+    Confía en OpenAI si hay API key; si no, vuelve null.
+    """
+    if not client:
+        return {"iso": None}
+    try:
+        messages = [
+            {"role": "system", "content":
+             "Sos un parser de fecha/hora en español de AR. "
+             "Devolvé JSON con clave 'iso' en formato ISO8601 con zona UTC si se puede inferir; "
+             "si no, devolvé iso:null. Aceptá frases como 'viernes a las 15', 'mañana 18hs', "
+             "'29/08 15:00', 'lunes 10am'."},
+            {"role": "user", "content": text}
+        ]
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            temperature=0,
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+        import json
+        data = json.loads(resp.choices[0].message.content)
+        iso = data.get("iso")
+        # Sanitizar: string no vacía
+        return {"iso": iso if isinstance(iso, str) and iso.strip() else None}
+    except Exception as e:
+        print(f"[AI][DATE][ERROR] {e}")
+        return {"iso": None}
