@@ -1,20 +1,13 @@
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { 
-  Users, 
-  Building2, 
   TrendingUp, 
   Target, 
   Calendar,
-  AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign,
-  Eye,
   UserCheck,
-  Zap,
-  ArrowRight,
-  Filter
+  Zap
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -29,6 +22,16 @@ export default function Dashboard() {
       color: 'text-blue-600',
       bgGradient: 'from-blue-500 to-indigo-500',
       description: 'Visitas confirmadas y por confirmar'
+    },
+    {
+      title: 'Visitas Esta Semana',
+      value: '18',
+      subtitle: 'Total programadas',
+      change: '+12',
+      icon: Clock,
+      color: 'text-orange-600',
+      bgGradient: 'from-orange-500 to-red-500',
+      description: 'Agenda de la semana actual'
     },
     {
       title: 'Conversaciones Activas',
@@ -49,16 +52,6 @@ export default function Dashboard() {
       color: 'text-purple-600',
       bgGradient: 'from-purple-500 to-pink-500',
       description: 'Clasificados automáticamente como serios'
-    },
-    {
-      title: 'Visitas Esta Semana',
-      value: '18',
-      subtitle: 'Total programadas',
-      change: '+12',
-      icon: Clock,
-      color: 'text-orange-600',
-      bgGradient: 'from-orange-500 to-red-500',
-      description: 'Agenda de la semana actual'
     }
   ];
 
@@ -172,7 +165,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-8">
       {/* Header del Dashboard */}
-      <div className="text-center space-y-4">
+      {/* <div className="text-center space-y-4">
         <h1 className="text-3xl md:text-4xl font-bold text-slate-900">
           Dashboard Inmobiliario
         </h1>
@@ -183,28 +176,32 @@ export default function Dashboard() {
           <Clock size={16} />
           <span>Actualizado hace 5 minutos</span>
         </div>
-      </div>
+      </div> */}
 
       {/* Métricas Clave */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {keyMetrics.map((metric, index) => (
-          <Card key={metric.title} className="p-6 hover:shadow-lg transition-all duration-200">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2 flex-1">
-                <p className="text-sm font-medium text-slate-600">{metric.title}</p>
-                <p className="text-3xl font-bold text-slate-900">{metric.value}</p>
-                <p className="text-sm text-slate-500">{metric.subtitle}</p>
-                <div className="flex items-center gap-1">
-                  <TrendingUp size={14} className="text-green-500" />
-                  <span className="text-sm text-green-600 font-medium">{metric.change}</span>
+          <Card key={metric.title} className="p-6 hover:shadow-lg transition-all duration-200 h-full">
+            <div className="flex flex-col h-full">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-600 mb-2">{metric.title}</p>
+                  <p className="text-3xl font-bold text-slate-900 mb-1">{metric.value}</p>
+                  <p className="text-sm text-slate-500">{metric.subtitle}</p>
+                </div>
+                <div className={`p-3 rounded-xl bg-gradient-to-r ${metric.bgGradient} shadow-md flex-shrink-0`}>
+                  <metric.icon size={24} className="text-white" />
                 </div>
               </div>
-              <div className={`p-3 rounded-xl bg-gradient-to-r ${metric.bgGradient} shadow-md`}>
-                <metric.icon size={24} className="text-white" />
+              
+              <div className="flex items-center gap-1 mb-4">
+                <TrendingUp size={14} className="text-green-500" />
+                <span className="text-sm text-green-600 font-medium">{metric.change}</span>
               </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-slate-100">
-              <p className="text-xs text-slate-500">{metric.description}</p>
+              
+              <div className="mt-auto pt-4 border-t border-slate-100">
+                <p className="text-xs text-slate-500 leading-relaxed">{metric.description}</p>
+              </div>
             </div>
           </Card>
         ))}
@@ -214,11 +211,11 @@ export default function Dashboard() {
       <div>
         <h2 className="text-xl font-bold text-slate-900 mb-4">Últimas Conversaciones</h2>
         <Card>
-          <div className="space-y-4">
-            {recentConversations.map((conversation, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
+    <div className="space-y-2">
+            {recentConversations.slice(0, 5).map((conversation, index) => (
+              <div key={index} className="flex items-start gap-3 p-2 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
                 <div className="flex-shrink-0">
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
                     {conversation.avatar}
                   </div>
                 </div>
@@ -227,7 +224,7 @@ export default function Dashboard() {
                     <h4 className="text-sm font-semibold text-slate-900">{conversation.leadName}</h4>
                     <span className="text-xs text-slate-500">Hace {conversation.time}</span>
                   </div>
-                  <p className="text-sm text-slate-600 mb-1 truncate">{conversation.lastMessage}</p>
+                  <p className="text-xs text-slate-600 mb-1 truncate">{conversation.lastMessage}</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-500">{conversation.property}</span>
                     <div className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -248,9 +245,9 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <div className="mt-4 pt-4 border-t border-slate-200 text-center">
+          <div className="mt-3 pt-3 border-t border-slate-200 text-center">
             <Button variant="secondary" size="sm">
-              Ver Todas las Conversaciones
+              Ver Más Conversaciones
             </Button>
           </div>
         </Card>
@@ -378,129 +375,9 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Acciones Rápidas */}
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 mb-4">Acciones Rápidas</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="p-6 hover:shadow-lg transition-all duration-200">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-xl">
-                <Users size={24} className="text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Gestión de Leads</h3>
-                <p className="text-slate-600 mb-4">
-                  Califica nuevos prospectos y optimiza tu pipeline de ventas
-                </p>
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <CheckCircle size={14} className="text-green-500" />
-                    <span>Calificación automática por IA</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <CheckCircle size={14} className="text-green-500" />
-                    <span>Scoring de calidad de prospect</span>
-                  </div>
-                </div>
-                <Button asChild variant="primary" className="w-full">
-                  <a href="/leads" className="flex items-center justify-center gap-2">
-                    Ver Leads
-                    <ArrowRight size={16} />
-                  </a>
-                </Button>
-              </div>
-            </div>
-          </Card>
 
-          <Card className="p-6 hover:shadow-lg transition-all duration-200">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-500 rounded-xl">
-                <Building2 size={24} className="text-white" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Catálogo Inmobiliario</h3>
-                <p className="text-slate-600 mb-4">
-                  Administra tu inventario y optimiza el matching con prospects
-                </p>
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <CheckCircle size={14} className="text-green-500" />
-                    <span>Matching inteligente de propiedades</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-700">
-                    <CheckCircle size={14} className="text-green-500" />
-                    <span>Gestión de precios y disponibilidad</span>
-                  </div>
-                </div>
-                <Button asChild variant="success" className="w-full">
-                  <a href="/properties" className="flex items-center justify-center gap-2">
-                    Ver Propiedades
-                    <ArrowRight size={16} />
-                  </a>
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
 
-      {/* Insights de Visitas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-          <div className="text-center py-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-3">
-              <Target size={24} className="text-blue-600" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Mejor Zona</h3>
-            <p className="text-slate-600 mb-4">
-              <strong>Belgrano</strong> tiene la mayor tasa de conversión (83%) 
-              y cierra ventas en promedio en 12 días.
-            </p>
-            <Button variant="primary" size="sm">
-              Ver Propiedades Belgrano
-            </Button>
-          </div>
-        </Card>
 
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-          <div className="text-center py-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-3">
-              <Zap size={24} className="text-green-600" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Oportunidad</h3>
-            <p className="text-slate-600 mb-4">
-              <strong>2 ambientes</strong> tienen demanda muy alta (80% conversión). 
-              Enfócate en conseguir más propiedades de este tipo.
-            </p>
-            <Button variant="success" size="sm">
-              Buscar 2 Ambientes
-            </Button>
-          </div>
-        </Card>
-      </div>
-
-      {/* Insights Generales */}
-      <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
-        <div className="text-center py-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
-            <Eye size={32} className="text-purple-600" />
-          </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">Insights del Sistema IA</h3>
-          <p className="text-slate-600 mb-6 max-w-2xl mx-auto">
-            Los leads auto-calificados por IA tienen 92% de tasa de confirmación de visitas. 
-            Las visitas en Belgrano y con departamentos de 2 ambientes son las más exitosas.
-            El horario ideal para visitas es entre 14:00 y 17:00hs.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button variant="primary">
-              Ver Análisis Completo
-            </Button>
-            <Button variant="secondary">
-              Configurar Alertas
-            </Button>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

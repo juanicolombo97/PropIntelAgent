@@ -8,9 +8,10 @@ import { ExternalLink, Edit } from 'lucide-react';
 
 interface PropertiesTableProps {
   properties: Property[];
+  onPropertyClick?: (property: Property) => void;
 }
 
-export function PropertiesTable({ properties }: PropertiesTableProps) {
+export function PropertiesTable({ properties, onPropertyClick }: PropertiesTableProps) {
   const getStatusBadge = (status: string) => {
     const variants = {
       ACTIVE: 'success' as const,
@@ -36,7 +37,11 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
         </TableHeader>
         <tbody>
           {properties?.map((property) => (
-            <TableRow key={property.PropertyId}>
+            <TableRow 
+              key={property.PropertyId}
+              onClick={() => onPropertyClick?.(property)}
+              className="cursor-pointer hover:bg-slate-50"
+            >
               <TableCell className="font-mono text-sm">{property.PropertyId}</TableCell>
               <TableCell className="max-w-xs">
                 <div className="truncate" title={property.Title}>
@@ -77,19 +82,26 @@ export function PropertiesTable({ properties }: PropertiesTableProps) {
 }
 
 function EditPriceForm({ propertyId, currentPrice }: { propertyId: string; currentPrice: number }) {
-  async function action(formData: FormData) {
-    'use server';
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     const price = Number(formData.get('Price'));
-    await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/admin/properties/${propertyId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Price: price }),
-      cache: 'no-store',
-    });
-  }
+    
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/admin/properties/${propertyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Price: price }),
+      });
+      // Opcional: recargar la página o actualizar el estado
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating price:', error);
+    }
+  };
 
   return (
-    <form action={action} className="flex gap-2">
+    <form onSubmit={handleSubmit} className="flex gap-2">
       <input
         name="Price"
         type="number"

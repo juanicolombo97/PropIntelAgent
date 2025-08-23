@@ -1,32 +1,51 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Admin } from '@/lib/api';
 import { PropertiesTable } from '@/components/properties/PropertiesTable';
-import { CreatePropertyForm } from '@/components/properties/CreatePropertyForm';
-import { PropertyFilter } from '@/components/properties/PropertyFilter';
+import { CreatePropertyModal } from '@/components/properties/CreatePropertyModal';
+import { PropertyDetailModal } from '@/components/properties/PropertyDetailModal';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Building2, Plus, DollarSign, Home, Filter } from 'lucide-react';
+import { Property } from '@/lib/types';
 
-async function getData(neighborhood?: string) {
-  try {
-    return await Admin.properties(neighborhood);
-  } catch (error) {
-    console.error('Error fetching properties:', error);
-    return { items: [] };
-  }
-}
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
 
-export default async function PropertiesPage({ 
-  searchParams 
-}: { 
-  searchParams: { neighborhood?: string } 
-}) {
-  const neighborhood = searchParams?.neighborhood;
-  const data = await getData(neighborhood);
+  useEffect(() => {
+    loadProperties();
+  }, []);
 
-  const totalProperties = data.items?.length || 0;
-  const activeProperties = data.items?.filter(p => p.Status === 'ACTIVE').length || 0;
-  const averagePrice = data.items?.length 
-    ? Math.round(data.items.reduce((sum, p) => sum + p.Price, 0) / data.items.length)
+  const loadProperties = async () => {
+    setLoading(true);
+    try {
+      const data = await Admin.properties();
+      setProperties(data.items || []);
+    } catch (error) {
+      console.error('Error fetching properties:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePropertyCreated = () => {
+    loadProperties();
+  };
+
+  const handlePropertyClick = (property: Property) => {
+    setSelectedProperty(property);
+    setIsDetailModalOpen(true);
+  };
+
+  const totalProperties = properties.length;
+  const activeProperties = properties.filter(p => p.Status === 'ACTIVE').length;
+  const averagePrice = properties.length 
+    ? Math.round(properties.reduce((sum, p) => sum + p.Price, 0) / properties.length)
     : 0;
 
   return (
@@ -100,17 +119,44 @@ export default async function PropertiesPage({
               <Filter size={18} className="mr-2" />
               Filtrar
             </Button>
-            <Button variant="primary" size="md">
+            <Button 
+              variant="primary" 
+              size="md"
+              onClick={() => setIsCreateModalOpen(true)}
+            >
               <Plus size={18} className="mr-2" />
               Cargar Propiedad
             </Button>
           </div>
         </div>
-        <PropertiesTable properties={data.items || []} />
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600">Cargando propiedades...</p>
+          </div>
+        ) : (
+          <PropertiesTable 
+            properties={properties} 
+            onPropertyClick={handlePropertyClick}
+          />
+        )}
       </div>
 
+      {/* Modals */}
+      <CreatePropertyModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onPropertyCreated={handlePropertyCreated}
+      />
+
+      <PropertyDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        property={selectedProperty}
+      />
+
       {/* Empty State */}
-      {!data.items?.length && (
+      {!loading && !properties.length && (
         <Card className="text-center py-12">
           <div className="space-y-4">
             <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
@@ -120,10 +166,14 @@ export default async function PropertiesPage({
             <p className="text-slate-600 max-w-md mx-auto">
               Comienza agregando tu primera propiedad para crear tu catálogo inmobiliario
             </p>
-            <button className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-md transition-all duration-200">
+            <Button 
+              variant="primary"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-2"
+            >
               <Plus size={18} />
               Agregar Primera Propiedad
-            </button>
+            </Button>
           </div>
         </Card>
       )}

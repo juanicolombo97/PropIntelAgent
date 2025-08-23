@@ -1,8 +1,31 @@
+'use client';
+
+import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Calendar, Clock, MapPin, User, Plus, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, MapPin, User, Plus, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function CalendarPage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    if (direction === 'prev') {
+      newDate.setDate(newDate.getDate() - 1);
+    } else {
+      newDate.setDate(newDate.getDate() + 1);
+    }
+    setCurrentDate(newDate);
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
   // Datos de ejemplo para las visitas
   const visits = [
     {
@@ -48,39 +71,39 @@ export default function CalendarPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="p-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl shadow-md">
-            <Calendar size={28} className="text-white" />
+      <div className="text-center space-y-2">
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <div className="p-2 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl shadow-md">
+            <Calendar size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Calendario de Visitas</h1>
-            <p className="text-lg text-slate-600">Gestiona y programa tus visitas de manera eficiente</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Calendario de Visitas</h1>
+            <p className="text-sm text-slate-600">Gestiona y programa tus visitas de manera eficiente</p>
           </div>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {stats.map((stat, index) => (
-          <Card key={index} className="p-4 text-center">
-            <p className="text-sm font-medium text-slate-600">{stat.label}</p>
-            <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+          <Card key={index} className="p-3 text-center">
+            <p className="text-xs font-medium text-slate-600">{stat.label}</p>
+            <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
           </Card>
         ))}
       </div>
 
       {/* Calendar Navigation */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm">
+            <Button variant="ghost" size="sm" onClick={() => navigateDate('prev')}>
               <ChevronLeft size={16} />
             </Button>
-            <h2 className="text-xl font-bold text-slate-900">Miércoles, 15 de Enero 2025</h2>
-            <Button variant="ghost" size="sm">
+            <h2 className="text-lg font-bold text-slate-900 capitalize">{formatDate(currentDate)}</h2>
+            <Button variant="ghost" size="sm" onClick={() => navigateDate('next')}>
               <ChevronRight size={16} />
             </Button>
           </div>
@@ -97,19 +120,19 @@ export default function CalendarPage() {
         </div>
 
         {/* Timeline */}
-        <div className="space-y-4">
+        <div className="space-y-2 max-h-64 overflow-y-auto">
           {visits.map((visit) => (
-            <div key={visit.id} className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+            <div key={visit.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
               <div className="flex-shrink-0 text-center">
-                <div className="text-lg font-bold text-slate-900">{visit.time}</div>
+                <div className="text-sm font-bold text-slate-900">{visit.time}</div>
                 <div className="text-xs text-slate-500">{visit.duration}</div>
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-start justify-between mb-1">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                      <User size={14} />
+                    <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-1">
+                      <User size={12} />
                       {visit.client}
                     </h3>
                     <p className="text-xs text-slate-500">{visit.phone}</p>
@@ -123,9 +146,9 @@ export default function CalendarPage() {
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
+                <div className="flex items-center gap-3 text-xs text-slate-600 mb-1">
                   <div className="flex items-center gap-1">
-                    <MapPin size={14} />
+                    <MapPin size={12} />
                     <span>{visit.address}</span>
                   </div>
                   <span className="text-slate-400">•</span>
@@ -133,11 +156,11 @@ export default function CalendarPage() {
                 </div>
                 
                 {visit.notes && (
-                  <p className="text-sm text-slate-500 italic">{visit.notes}</p>
+                  <p className="text-xs text-slate-500 italic">{visit.notes}</p>
                 )}
               </div>
               
-              <div className="flex-shrink-0 flex gap-2">
+              <div className="flex-shrink-0 flex gap-1">
                 <Button variant="ghost" size="sm">
                   Editar
                 </Button>
@@ -166,13 +189,13 @@ export default function CalendarPage() {
       </Card>
 
       {/* Week Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-7 gap-2">
         {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day, index) => (
-          <Card key={day} className={`p-3 ${index === 2 ? 'ring-2 ring-purple-500 bg-purple-50' : ''}`}>
+          <Card key={day} className={`p-2 ${index === 2 ? 'ring-2 ring-purple-500 bg-purple-50' : ''}`}>
             <div className="text-center">
               <div className="text-xs font-medium text-slate-600">{day}</div>
-              <div className="text-lg font-bold text-slate-900">{13 + index}</div>
-              <div className="text-xs text-slate-500 mt-2">
+              <div className="text-sm font-bold text-slate-900">{13 + index}</div>
+              <div className="text-xs text-slate-500 mt-1">
                 {index === 0 ? '2 visitas' :
                  index === 1 ? '1 visita' :
                  index === 2 ? '3 visitas' :

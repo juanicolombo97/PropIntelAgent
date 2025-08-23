@@ -7,9 +7,10 @@ import { formatDate, formatCurrency } from '@/lib/utils';
 interface LeadsTableProps {
   leads: Lead[];
   title: string;
+  onLeadClick?: (lead: Lead) => void;
 }
 
-export function LeadsTable({ leads, title }: LeadsTableProps) {
+export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
   const getStatusBadge = (status: string) => {
     const variants = {
       NEW: 'warning' as const,
@@ -42,7 +43,11 @@ export function LeadsTable({ leads, title }: LeadsTableProps) {
           </TableHeader>
           <tbody>
             {leads?.map((lead) => (
-              <TableRow key={lead.LeadId}>
+                              <TableRow 
+                  key={lead.LeadId} 
+                  onClick={() => onLeadClick?.(lead)}
+                  className="cursor-pointer hover:bg-slate-50"
+                >
                 <TableCell>
                   <a 
                     href={`/leads/${encodeURIComponent(lead.LeadId)}`}

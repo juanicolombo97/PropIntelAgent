@@ -1,23 +1,51 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Admin } from '@/lib/api';
 import { LeadsTable } from '@/components/leads/LeadsTable';
+import { CreateLeadModal } from '@/components/leads/CreateLeadModal';
+import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Users, TrendingUp, Filter, Search, Plus } from 'lucide-react';
+import { Lead } from '@/lib/types';
 
-async function fetchData() {
-  try {
-    const [newLeads, qualifiedLeads] = await Promise.all([
-      Admin.leadsByStatus("NEW"),
-      Admin.leadsByStatus("QUALIFIED"),
-    ]);
-    return { newLeads, qualifiedLeads };
-  } catch (error) {
-    console.error('Error fetching leads:', error);
-    return { newLeads: { items: [] }, qualifiedLeads: { items: [] } };
-  }
-}
+export default function LeadsPage() {
+  const [newLeads, setNewLeads] = useState<Lead[]>([]);
+  const [qualifiedLeads, setQualifiedLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-export default async function LeadsPage() {
-  const { newLeads, qualifiedLeads } = await fetchData();
+  useEffect(() => {
+    loadLeads();
+  }, []);
+
+  const loadLeads = async () => {
+    setLoading(true);
+    try {
+      const [newLeadsData, qualifiedLeadsData] = await Promise.all([
+        Admin.leadsByStatus("NEW"),
+        Admin.leadsByStatus("QUALIFIED"),
+      ]);
+      setNewLeads(newLeadsData.items || []);
+      setQualifiedLeads(qualifiedLeadsData.items || []);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeadCreated = () => {
+    loadLeads();
+  };
+
+  const handleLeadClick = (lead: Lead) => {
+    setSelectedLead(lead);
+    setIsDetailModalOpen(true);
+  };
 
   return (
     <div className="space-y-8">
@@ -41,7 +69,7 @@ export default async function LeadsPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-600">Total Leads</p>
               <p className="text-3xl font-bold text-slate-900">
-                {(newLeads.items?.length || 0) + (qualifiedLeads.items?.length || 0)}
+                {loading ? '...' : newLeads.length + qualifiedLeads.length}
               </p>
               <p className="text-sm text-slate-500">En el sistema</p>
             </div>
@@ -55,7 +83,7 @@ export default async function LeadsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-600">Leads Nuevos</p>
-              <p className="text-3xl font-bold text-slate-900">{newLeads.items?.length || 0}</p>
+              <p className="text-3xl font-bold text-slate-900">{loading ? '...' : newLeads.length}</p>
               <p className="text-sm text-slate-500">Pendientes de calificación</p>
             </div>
             <div className="p-4 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl shadow-md">
@@ -68,7 +96,7 @@ export default async function LeadsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-600">Leads Calificados</p>
-              <p className="text-3xl font-bold text-slate-900">{qualifiedLeads.items?.length || 0}</p>
+              <p className="text-3xl font-bold text-slate-900">{loading ? '...' : qualifiedLeads.length}</p>
               <p className="text-sm text-slate-500">Listos para venta</p>
             </div>
             <div className="p-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl shadow-md">
@@ -96,21 +124,47 @@ export default async function LeadsPage() {
               <option>Calificados</option>
             </select>
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-md transition-all duration-200">
+          <Button 
+            variant="primary"
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2"
+          >
             <Plus size={18} />
             Nuevo Lead
-          </button>
+          </Button>
         </div>
       </Card>
 
       {/* Tables */}
       <div className="space-y-8">
-        <LeadsTable leads={newLeads.items || []} title="Leads Nuevos" />
-        <LeadsTable leads={qualifiedLeads.items || []} title="Leads Calificados" />
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-slate-600">Cargando leads...</p>
+          </div>
+        ) : (
+                      <>
+              <LeadsTable leads={newLeads} title="Leads Nuevos" onLeadClick={handleLeadClick} />
+              <LeadsTable leads={qualifiedLeads} title="Leads Calificados" onLeadClick={handleLeadClick} />
+            </>
+        )}
       </div>
 
+      {/* Modals */}
+      <CreateLeadModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onLeadCreated={handleLeadCreated}
+      />
+      
+      <LeadDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        lead={selectedLead}
+      />
+
       {/* Empty State */}
-      {(!newLeads.items?.length && !qualifiedLeads.items?.length) && (
+      {(!loading && !newLeads.length && !qualifiedLeads.length) && (
         <Card className="text-center py-12">
           <div className="space-y-4">
             <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
@@ -120,10 +174,14 @@ export default async function LeadsPage() {
             <p className="text-slate-600 max-w-md mx-auto">
               Comienza agregando tu primer lead para empezar a gestionar tu pipeline de ventas
             </p>
-            <button className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl font-semibold hover:shadow-md transition-all duration-200">
+            <Button 
+              variant="primary"
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-2"
+            >
               <Plus size={18} />
               Agregar Primer Lead
-            </button>
+            </Button>
           </div>
         </Card>
       )}
