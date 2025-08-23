@@ -26,9 +26,9 @@ export default function LeadsPage() {
     setLoading(true);
     try {
       const [newLeadsData, qualifiedLeadsData] = await Promise.all([
-        Admin.leadsByStatus("NEW"),
-        Admin.leadsByStatus("QUALIFIED"),
-      ]);
+    Admin.leadsByStatus("NEW"),
+    Admin.leadsByStatus("QUALIFIED"),
+  ]);
       setNewLeads(newLeadsData.items || []);
       setQualifiedLeads(qualifiedLeadsData.items || []);
     } catch (error) {
@@ -82,9 +82,9 @@ export default function LeadsPage() {
         <Card className="p-6 hover:shadow-lg transition-all duration-200">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-600">Leads Nuevos</p>
+              <p className="text-sm font-medium text-slate-600">Nuevos</p>
               <p className="text-3xl font-bold text-slate-900">{loading ? '...' : newLeads.length}</p>
-              <p className="text-sm text-slate-500">Pendientes de calificación</p>
+              <p className="text-sm text-slate-500">Estado: NEW</p>
             </div>
             <div className="p-4 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-2xl shadow-md">
               <Filter size={28} className="text-white" />
@@ -95,9 +95,9 @@ export default function LeadsPage() {
         <Card className="p-6 hover:shadow-lg transition-all duration-200">
           <div className="flex items-center justify-between">
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-600">Leads Calificados</p>
+              <p className="text-sm font-medium text-slate-600">Calificados</p>
               <p className="text-3xl font-bold text-slate-900">{loading ? '...' : qualifiedLeads.length}</p>
-              <p className="text-sm text-slate-500">Listos para venta</p>
+              <p className="text-sm text-slate-500">Estado: QUALIFIED</p>
             </div>
             <div className="p-4 bg-gradient-to-r from-green-600 to-emerald-600 rounded-2xl shadow-md">
               <TrendingUp size={28} className="text-white" />
@@ -135,7 +135,7 @@ export default function LeadsPage() {
         </div>
       </Card>
 
-      {/* Tables */}
+            {/* Table */}
       <div className="space-y-8">
         {loading ? (
           <div className="text-center py-12">
@@ -143,10 +143,11 @@ export default function LeadsPage() {
             <p className="text-slate-600">Cargando leads...</p>
           </div>
         ) : (
-                      <>
-              <LeadsTable leads={newLeads} title="Leads Nuevos" onLeadClick={handleLeadClick} />
-              <LeadsTable leads={qualifiedLeads} title="Leads Calificados" onLeadClick={handleLeadClick} />
-            </>
+          <LeadsTable 
+            leads={[...newLeads, ...qualifiedLeads]} 
+            title="Todos los Leads" 
+            onLeadClick={handleLeadClick} 
+          />
         )}
       </div>
 
@@ -164,13 +165,13 @@ export default function LeadsPage() {
       />
 
       {/* Empty State */}
-      {(!loading && !newLeads.length && !qualifiedLeads.length) && (
+      {(!loading && newLeads.length === 0 && qualifiedLeads.length === 0) && (
         <Card className="text-center py-12">
           <div className="space-y-4">
             <div className="mx-auto w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center">
               <Users size={32} className="text-slate-400" />
             </div>
-            <h3 className="text-xl font-semibold text-slate-900">No hay leads aún</h3>
+            <h3 className="text-xl font-semibold text-slate-900">No hay leads registrados</h3>
             <p className="text-slate-600 max-w-md mx-auto">
               Comienza agregando tu primer lead para empezar a gestionar tu pipeline de ventas
             </p>

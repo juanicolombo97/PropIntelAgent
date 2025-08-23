@@ -51,15 +51,7 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
         Features: formData.Features || ''
       };
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/admin/properties`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al crear la propiedad');
-      }
+      const response = await Admin.createProperty(payload);
 
       // Reset form
       setFormData({
@@ -87,8 +79,8 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 min-h-screen">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-200">
           <div className="flex items-center gap-3">

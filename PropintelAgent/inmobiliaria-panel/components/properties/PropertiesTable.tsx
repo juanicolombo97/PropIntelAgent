@@ -88,11 +88,7 @@ function EditPriceForm({ propertyId, currentPrice }: { propertyId: string; curre
     const price = Number(formData.get('Price'));
     
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_BASE}/admin/properties/${propertyId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Price: price }),
-      });
+      await Admin.updateProperty(propertyId, { Price: price });
       // Opcional: recargar la página o actualizar el estado
       window.location.reload();
     } catch (error) {
