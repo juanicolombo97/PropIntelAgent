@@ -3,7 +3,8 @@ import { PropertiesTable } from '@/components/properties/PropertiesTable';
 import { CreatePropertyForm } from '@/components/properties/CreatePropertyForm';
 import { PropertyFilter } from '@/components/properties/PropertyFilter';
 import { Card } from '@/components/ui/Card';
-import { Building2, Plus, DollarSign, Home } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Building2, Plus, DollarSign, Home, Filter } from 'lucide-react';
 
 async function getData(neighborhood?: string) {
   try {
@@ -87,23 +88,23 @@ export default async function PropertiesPage({
         </Card>
       </div>
 
-      {/* Filter Section */}
-      <PropertyFilter />
-
-      {/* Create Property Form */}
-      <CreatePropertyForm />
-
-      {/* Properties Table */}
+      {/* Properties Management */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Lista de Propiedades</h2>
             <p className="text-slate-600">Gestiona tu inventario inmobiliario</p>
           </div>
-          <button className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-semibold hover:shadow-md transition-all duration-200">
-            <Plus size={18} />
-            Agregar Propiedad
-          </button>
+          <div className="flex items-center gap-3">
+            <Button variant="secondary" size="md">
+              <Filter size={18} className="mr-2" />
+              Filtrar
+            </Button>
+            <Button variant="primary" size="md">
+              <Plus size={18} className="mr-2" />
+              Cargar Propiedad
+            </Button>
+          </div>
         </div>
         <PropertiesTable properties={data.items || []} />
       </div>

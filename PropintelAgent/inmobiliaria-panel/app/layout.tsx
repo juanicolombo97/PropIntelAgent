@@ -1,5 +1,5 @@
 import './globals.css';
-import { Home, Users, Building2, Menu } from 'lucide-react';
+import { Home, Users, Building2, Calendar, BarChart3, Menu } from 'lucide-react';
 
 export const metadata = { 
   title: "Panel Inmobiliaria",
@@ -54,6 +54,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 >
                   <Building2 size={16} className="group-hover:scale-110 transition-transform" />
                   Propiedades
+                </a>
+                <a 
+                  href="/calendar" 
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-white/50 transition-all duration-200 group"
+                >
+                  <Calendar size={16} className="group-hover:scale-110 transition-transform" />
+                  Calendario
+                </a>
+                <a 
+                  href="/stats" 
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-white/50 transition-all duration-200 group"
+                >
+                  <BarChart3 size={16} className="group-hover:scale-110 transition-transform" />
+                  Estadísticas
                 </a>
               </nav>
               
