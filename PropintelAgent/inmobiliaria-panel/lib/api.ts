@@ -2,8 +2,18 @@ import { Lead, Property, Message, Visit, ApiResponse, CreatePropertyData } from 
 
 const API_BASE = '/api';
 
+// Función para obtener el loading global
+let globalLoading: { startLoading: (msg: string) => void; stopLoading: () => void } | null = null;
+
+export function setGlobalLoading(loading: { startLoading: (msg: string) => void; stopLoading: () => void }) {
+  globalLoading = loading;
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   try {
+    // Mostrar loading global
+    globalLoading?.startLoading('Cargando datos...');
+    
     const headers = {
       'Content-Type': 'application/json',
       ...init?.headers,
@@ -42,6 +52,9 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   } catch (error) {
     console.error('💥 API Error:', error);
     throw error;
+  } finally {
+    // Ocultar loading global
+    globalLoading?.stopLoading();
   }
 }
 

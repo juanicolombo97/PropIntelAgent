@@ -1,5 +1,7 @@
 import './globals.css';
 import { Header } from '@/components/Header';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
+import { LoadingProvider } from '@/components/LoadingProvider';
 
 export const metadata = { 
   title: "Panel Inmobiliaria",
@@ -16,12 +18,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <Header />
-        
-        {/* Contenido principal */}
-        <main className="max-w-7xl mx-auto px-4 py-8">
-          {children}
-        </main>
+        <LoadingProvider>
+          <Header />
+          
+          {/* Contenido principal */}
+          <main className="max-w-7xl mx-auto px-4 py-8">
+            {children}
+          </main>
+          
+          {/* Loading overlay global */}
+          <LoadingOverlay />
+        </LoadingProvider>
       </body>
     </html>
   );
