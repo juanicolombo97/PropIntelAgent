@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 
 export default function Dashboard() {
+  console.log('🚀 Dashboard component loaded');
+  
   const [loading, setLoading] = useState(true);
   const [keyMetrics, setKeyMetrics] = useState([
     {
@@ -63,8 +65,11 @@ export default function Dashboard() {
   const [visits, setVisits] = useState<Visit[]>([]);
 
   useEffect(() => {
+    console.log('🔄 Dashboard useEffect triggered');
+    
     const loadDashboardData = async () => {
       try {
+        console.log('📊 Starting to load dashboard data...');
         setLoading(true);
         
         // Cargar leads por estado, propiedades y visitas
