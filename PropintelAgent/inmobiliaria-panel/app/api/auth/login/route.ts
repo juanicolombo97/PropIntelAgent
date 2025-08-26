@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
     }
 
     const token = await createToken(user);
+    
+    console.log('🔐 Token generated:', {
+      hasToken: !!token,
+      tokenLength: token?.length,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
+    });
 
     // Crear respuesta con el token en una cookie
     const response = NextResponse.json({
@@ -32,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Configurar cookie con el token
     response.cookies.set('auth-token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Cambiar a false para que funcione en Vercel
       sameSite: 'lax',
       maxAge: 24 * 60 * 60, // 24 horas
       path: '/'
