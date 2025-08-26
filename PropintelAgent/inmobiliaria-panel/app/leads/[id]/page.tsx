@@ -1,10 +1,11 @@
 import { Admin } from '@/lib/api';
+import Link from 'next/link';
 import { LeadProfile } from '@/components/leads/LeadProfile';
 import { MessagesList } from '@/components/leads/MessagesList';
 import { VisitsTable } from '@/components/leads/VisitsTable';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { ArrowLeft, User, MessageSquare, Calendar, Phone, Mail, MapPin, DollarSign } from 'lucide-react';
+import { ArrowLeft, User, MessageSquare, Calendar, Phone, MapPin, DollarSign } from 'lucide-react';
 
 export default async function LeadDetail({ params }: { params: { id: string } }) {
   const leadId = decodeURIComponent(params.id);
@@ -22,10 +23,10 @@ export default async function LeadDetail({ params }: { params: { id: string } })
         <div className="flex items-center justify-between animate-fade-in">
           <div className="flex items-center gap-4">
             <Button asChild variant="ghost" size="md">
-              <a href="/leads" className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+              <Link href="/leads" className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
                 <ArrowLeft size={18} />
                 Volver a Leads
-              </a>
+              </Link>
             </Button>
             <div className="h-8 w-px bg-slate-300"></div>
             <div>
@@ -160,10 +161,10 @@ export default async function LeadDetail({ params }: { params: { id: string } })
       <div className="space-y-8">
         <div className="flex items-center gap-4">
           <Button asChild variant="ghost" size="md">
-            <a href="/leads" className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+            <Link href="/leads" className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
               <ArrowLeft size={18} />
               Volver a Leads
-            </a>
+            </Link>
           </Button>
           <div className="h-8 w-px bg-slate-300"></div>
           <div>
@@ -181,7 +182,7 @@ export default async function LeadDetail({ params }: { params: { id: string } })
               No se pudieron cargar los detalles del lead. Verifica que el ID sea correcto.
             </p>
             <Button asChild variant="primary">
-              <a href="/leads">Volver a la lista</a>
+              <Link href="/leads">Volver a la lista</Link>
             </Button>
           </div>
         </Card>

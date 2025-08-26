@@ -18,7 +18,7 @@ export interface LoginCredentials {
 }
 
 // API para autenticación con AWS Lambda/Backend
-async function callAuthAPI(endpoint: string, data: any): Promise<any> {
+async function callAuthAPI(endpoint: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
   const API_BASE = process.env.WHATSAPP_API_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
   const API_KEY = process.env.ADMIN_API_KEY;
   

@@ -1,4 +1,5 @@
 import { Lead } from '@/lib/types';
+import Link from 'next/link';
 import { Table, TableHeader, TableRow, TableCell, TableHeaderCell } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';
@@ -49,12 +50,12 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
                   className="cursor-pointer hover:bg-slate-50"
                 >
                 <TableCell>
-                  <a 
+                  <Link 
                     href={`/leads/${encodeURIComponent(lead.LeadId)}`}
                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
                   >
                     {lead.LeadId}
-                  </a>
+                  </Link>
                 </TableCell>
                 <TableCell>{getStatusBadge(lead.Status)}</TableCell>
                 <TableCell>{lead.Intent || '-'}</TableCell>
