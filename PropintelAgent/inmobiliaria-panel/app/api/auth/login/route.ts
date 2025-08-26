@@ -43,6 +43,17 @@ export async function POST(request: NextRequest) {
       maxAge: 24 * 60 * 60, // 24 horas
       path: '/'
     });
+    
+    console.log('🍪 Cookie configurada:', {
+      name: 'auth-token',
+      hasToken: !!token,
+      tokenLength: token?.length,
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60,
+      path: '/'
+    });
 
     return response;
   } catch (error) {
