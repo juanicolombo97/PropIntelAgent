@@ -21,8 +21,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Permitir acceso a rutas de autenticación sin verificar
-  if (pathname.startsWith('/api/auth/')) {
+  // Permitir acceso a rutas de autenticación específicas sin verificar
+  if (pathname === '/api/auth/login' || pathname === '/api/auth/logout') {
     return NextResponse.next();
   }
 
