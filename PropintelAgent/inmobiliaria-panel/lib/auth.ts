@@ -84,7 +84,14 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
 export async function authenticateUser(username: string, password: string): Promise<AuthUser | null> {
   // Intentar autenticación con AWS Lambda/Backend primero
   try {
-    const result = await callAuthAPI('auth/login', { username, password });
+    const result = await callAuthAPI('auth/login', { username, password }) as {
+      success: boolean;
+      user?: {
+        username: string;
+        role?: string;
+        email?: string;
+      };
+    };
     
     if (result.success && result.user) {
       return {
@@ -117,12 +124,19 @@ export async function authenticateUser(username: string, password: string): Prom
 // Función para validar usuarios remotamente (opcional)
 export async function validateUserWithRemote(username: string): Promise<AuthUser | null> {
   try {
-    const result = await callAuthAPI('auth/validate', { username });
+    const result = await callAuthAPI('auth/validate', { username }) as {
+      success: boolean;
+      user?: {
+        username: string;
+        role?: string;
+        email?: string;
+      };
+    };
     
     if (result.success && result.user) {
       return {
         username: result.user.username,
-        role: result.user.role,
+        role: result.user.role || 'admin',
         email: result.user.email
       };
     }
