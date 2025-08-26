@@ -15,6 +15,11 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
 
+  console.log('🔍 Login page loaded:', {
+    redirectTo,
+    searchParams: Object.fromEntries(searchParams.entries())
+  });
+
   useEffect(() => {
     // Verificar si ya está autenticado
     const checkAuth = async () => {
@@ -22,10 +27,12 @@ function LoginForm() {
         const response = await fetch('/api/auth/me');
         if (response.ok) {
           // Ya está autenticado, redirigir
+          console.log('🔄 Already authenticated, redirecting to:', redirectTo);
           router.push(redirectTo);
         }
       } catch (error) {
         // No autenticado, continuar en login
+        console.log('🔐 Not authenticated, staying on login page');
       }
     };
 
@@ -62,7 +69,21 @@ function LoginForm() {
       if (response.ok) {
         console.log('✅ Login successful, redirecting to:', redirectTo);
         // Login exitoso, redirigir
-        router.push(redirectTo);
+        try {
+          await router.push(redirectTo);
+          console.log('🔄 Router.push completed');
+          
+          // Timeout de seguridad para forzar redirección si router no funciona
+          setTimeout(() => {
+            console.log('⏰ Redirect timeout, forcing navigation');
+            window.location.href = redirectTo;
+          }, 2000);
+          
+        } catch (redirectError) {
+          console.error('💥 Redirect error:', redirectError);
+          // Fallback: usar window.location
+          window.location.href = redirectTo;
+        }
       } else {
         console.log('❌ Login failed:', data.error);
         setError(data.error || 'Error de autenticación');
