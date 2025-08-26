@@ -31,7 +31,7 @@ async function callAuthAPI(endpoint: string, data: Record<string, unknown>): Pro
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-API-Key': API_KEY
+      'x-api-key': API_KEY
     },
     body: JSON.stringify(data),
     // Agregar timeout para evitar bloqueos
@@ -102,20 +102,20 @@ export async function authenticateUser(username: string, password: string): Prom
     }
   } catch (error) {
     console.warn('Error en autenticación remota, usando fallback local:', error);
-    
-    // Fallback a credenciales de entorno solo en desarrollo/emergencia
-    const fallbackUsername = process.env.ADMIN_USERNAME;
-    const fallbackPassword = process.env.ADMIN_PASSWORD;
-    
-    if (fallbackUsername && fallbackPassword && 
-        username === fallbackUsername && password === fallbackPassword) {
-      console.log('Usando credenciales de fallback local');
-      return { 
-        username, 
-        role: 'admin',
-        email: process.env.ADMIN_EMAIL || 'admin@local.dev'
-      };
-    }
+  }
+  
+  // Fallback a credenciales de entorno solo en desarrollo/emergencia
+  const fallbackUsername = process.env.ADMIN_USERNAME;
+  const fallbackPassword = process.env.ADMIN_PASSWORD;
+  
+  if (fallbackUsername && fallbackPassword && 
+      username === fallbackUsername && password === fallbackPassword) {
+    console.log('Usando credenciales de fallback local');
+    return { 
+      username, 
+      role: 'admin',
+      email: process.env.ADMIN_EMAIL || 'admin@local.dev'
+    };
   }
   
   return null;
