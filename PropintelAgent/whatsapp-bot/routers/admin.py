@@ -1,14 +1,27 @@
 # routers/admin.py
 import os
+import hashlib
+import hmac
+from datetime import datetime, timedelta
+from typing import Dict, Any
 from fastapi import APIRouter, Body
 from fastapi.responses import JSONResponse
 from fastapi import Depends, Header, HTTPException
+from pydantic import BaseModel
 
 from boto3.dynamodb.conditions import Key, Attr
 from services.dynamo import t_leads, t_msgs, t_props, t_visits
 from models.schemas import dec_to_native
 
 router = APIRouter(prefix="/admin")
+
+# Modelos para autenticación
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class ValidateRequest(BaseModel):
+    username: str
 
 # Función de autenticación
 def verify_api_key(x_api_key: str = Header(None)):
@@ -21,6 +34,98 @@ def verify_api_key(x_api_key: str = Header(None)):
         raise HTTPException(status_code=401, detail="API key inválida")
     
     return True
+
+# Función para verificar credenciales
+def verify_credentials(username: str, password: str) -> Dict[str, Any] | None:
+    """
+    Verifica credenciales contra variables de entorno o base de datos.
+    En producción, esto debería consultar una tabla de usuarios en DynamoDB.
+    """
+    # Credenciales desde variables de entorno
+    valid_users = {}
+    
+    # Usuario principal desde variables de entorno
+    admin_username = os.getenv("ADMIN_USERNAME")
+    admin_password = os.getenv("ADMIN_PASSWORD") 
+    admin_email = os.getenv("ADMIN_EMAIL", "admin@propintel.com")
+    
+    if admin_username and admin_password:
+        valid_users[admin_username] = {
+            "password": admin_password,
+            "role": "admin",
+            "email": admin_email
+        }
+    
+    # Usuarios adicionales desde variables de entorno (formato: USER_username_PASSWORD, USER_username_EMAIL, USER_username_ROLE)
+    for key, value in os.environ.items():
+        if key.startswith("USER_") and key.endswith("_PASSWORD"):
+            user_prefix = key[5:-9]  # Extraer username del formato USER_username_PASSWORD
+            user_email = os.getenv(f"USER_{user_prefix}_EMAIL", f"{user_prefix.lower()}@propintel.com")
+            user_role = os.getenv(f"USER_{user_prefix}_ROLE", "user")
+            
+            valid_users[user_prefix.lower()] = {
+                "password": value,
+                "role": user_role,
+                "email": user_email
+            }
+    
+    # Verificar credenciales
+    if username.lower() in valid_users:
+        user_data = valid_users[username.lower()]
+        if user_data["password"] == password:
+            return {
+                "username": username,
+                "role": user_data["role"],
+                "email": user_data["email"]
+            }
+    
+    return None
+
+@router.post("/auth/login")
+def login(request: LoginRequest):
+    """Endpoint para autenticación de usuarios"""
+    user = verify_credentials(request.username, request.password)
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    
+    return {
+        "success": True,
+        "user": user,
+        "message": "Autenticación exitosa"
+    }
+
+@router.post("/auth/validate") 
+def validate_user(request: ValidateRequest):
+    """Endpoint para validar si un usuario existe"""
+    # En este caso simple, solo verificamos si el usuario está en las variables de entorno
+    admin_username = os.getenv("ADMIN_USERNAME")
+    
+    if request.username == admin_username:
+        return {
+            "success": True,
+            "user": {
+                "username": request.username,
+                "role": "admin",
+                "email": os.getenv("ADMIN_EMAIL", "admin@propintel.com")
+            }
+        }
+    
+    # Verificar usuarios adicionales
+    for key in os.environ.keys():
+        if key.startswith("USER_") and key.endswith("_PASSWORD"):
+            user_prefix = key[5:-9]
+            if user_prefix.lower() == request.username.lower():
+                return {
+                    "success": True,
+                    "user": {
+                        "username": request.username,
+                        "role": os.getenv(f"USER_{user_prefix}_ROLE", "user"),
+                        "email": os.getenv(f"USER_{user_prefix}_EMAIL", f"{user_prefix.lower()}@propintel.com")
+                    }
+                }
+    
+    raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
 
 
