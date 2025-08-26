@@ -72,8 +72,14 @@ async function handleRequest(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'x-api-key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || '',
+      'x-api-key': process.env.ADMIN_API_KEY || '',
     };
+    
+    console.log('🔑 API Key configurada:', {
+      hasApiKey: !!process.env.ADMIN_API_KEY,
+      apiKeyLength: process.env.ADMIN_API_KEY?.length,
+      apiKeyPreview: process.env.ADMIN_API_KEY ? `${process.env.ADMIN_API_KEY.substring(0, 10)}...` : 'none'
+    });
 
     // Agregar el token JWT si existe
     if (authToken) {
