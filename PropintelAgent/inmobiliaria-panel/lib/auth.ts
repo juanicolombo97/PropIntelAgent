@@ -82,8 +82,13 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
 }
 
 export async function authenticateUser(username: string, password: string): Promise<AuthUser | null> {
+  console.log('🔐 Intentando autenticar usuario:', username);
+  console.log('🌐 API URL:', process.env.WHATSAPP_API_URL);
+  console.log('🔑 API KEY configurada:', !!process.env.ADMIN_API_KEY);
+  
   // Intentar autenticación con AWS Lambda/Backend primero
   try {
+    console.log('📡 Intentando autenticación remota...');
     const result = await callAuthAPI('auth/login', { username, password }) as {
       success: boolean;
       user?: {
@@ -93,7 +98,10 @@ export async function authenticateUser(username: string, password: string): Prom
       };
     };
     
+    console.log('📡 Respuesta remota:', result);
+    
     if (result.success && result.user) {
+      console.log('✅ Autenticación remota exitosa');
       return {
         username: result.user.username,
         role: result.user.role || 'admin',
@@ -101,16 +109,21 @@ export async function authenticateUser(username: string, password: string): Prom
       };
     }
   } catch (error) {
-    console.warn('Error en autenticación remota, usando fallback local:', error);
+    console.warn('⚠️ Error en autenticación remota, usando fallback local:', error);
   }
   
   // Fallback a credenciales de entorno solo en desarrollo/emergencia
   const fallbackUsername = process.env.ADMIN_USERNAME;
   const fallbackPassword = process.env.ADMIN_PASSWORD;
   
+  console.log('🔍 Verificando credenciales de fallback:');
+  console.log('  - Usuario esperado:', fallbackUsername);
+  console.log('  - Usuario recibido:', username);
+  console.log('  - Contraseña configurada:', !!fallbackPassword);
+  
   if (fallbackUsername && fallbackPassword && 
       username === fallbackUsername && password === fallbackPassword) {
-    console.log('Usando credenciales de fallback local');
+    console.log('✅ Usando credenciales de fallback local');
     return { 
       username, 
       role: 'admin',
@@ -118,6 +131,7 @@ export async function authenticateUser(username: string, password: string): Prom
     };
   }
   
+  console.log('❌ Credenciales inválidas');
   return null;
 }
 
