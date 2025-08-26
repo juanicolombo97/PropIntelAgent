@@ -181,11 +181,23 @@ export function getTokenFromRequest(request: NextRequest): string | null {
 export async function isAuthenticated(request: NextRequest): Promise<AuthUser | null> {
   const token = getTokenFromRequest(request);
   
+  console.log('🔐 isAuthenticated check:', {
+    hasToken: !!token,
+    tokenLength: token?.length,
+    pathname: request.nextUrl.pathname
+  });
+  
   if (!token) {
+    console.log('❌ No token found in request');
     return null;
   }
 
   const user = await verifyToken(token);
+  
+  console.log('🔐 Token verification result:', {
+    hasUser: !!user,
+    username: user?.username
+  });
   
   // Opcional: validar usuario con servicio remoto periódicamente
   if (user && Math.random() < 0.1) { // 10% de las veces validar remotamente
