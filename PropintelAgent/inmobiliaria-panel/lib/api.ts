@@ -9,6 +9,13 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     };
 
+    console.log('🌐 API Request:', {
+      url: `${API_BASE}${path}`,
+      method: init?.method || 'GET',
+      hasCredentials: true,
+      headers: headers
+    });
+
     const res = await fetch(`${API_BASE}${path}`, { 
       cache: "no-store", 
       credentials: 'include', // Incluir cookies de autenticación
@@ -16,14 +23,24 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
       headers,
     });
     
+    console.log('📡 API Response:', {
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok,
+      url: res.url
+    });
+    
     if (!res.ok) {
       const text = await res.text();
+      console.error('❌ API Error Response:', text);
       throw new Error(`${res.status} ${res.statusText}: ${text}`);
     }
     
-    return res.json();
+    const data = await res.json();
+    console.log('✅ API Success:', data);
+    return data;
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('💥 API Error:', error);
     throw error;
   }
 }

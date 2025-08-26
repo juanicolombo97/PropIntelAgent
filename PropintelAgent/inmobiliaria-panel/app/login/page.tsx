@@ -37,6 +37,8 @@ function LoginForm() {
     setLoading(true);
     setError('');
 
+    console.log('🔐 Login attempt:', { username });
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -44,17 +46,29 @@ function LoginForm() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ username, password }),
+        credentials: 'include', // Asegurar que se incluyan cookies
+      });
+
+      console.log('📡 Login response:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       const data = await response.json();
+      console.log('📄 Login data:', data);
 
       if (response.ok) {
+        console.log('✅ Login successful, redirecting to:', redirectTo);
         // Login exitoso, redirigir
         router.push(redirectTo);
       } else {
+        console.log('❌ Login failed:', data.error);
         setError(data.error || 'Error de autenticación');
       }
     } catch (error) {
+      console.error('💥 Login error:', error);
       setError('Error de conexión');
     } finally {
       setLoading(false);
