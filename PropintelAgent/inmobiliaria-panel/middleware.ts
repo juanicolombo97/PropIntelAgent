@@ -8,8 +8,11 @@ const PUBLIC_ROUTES = ['/login', '/api/auth/login'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  console.log('🛡️ Middleware ejecutándose para:', pathname);
+
   // Permitir acceso a rutas públicas
   if (PUBLIC_ROUTES.includes(pathname)) {
+    console.log('✅ Ruta pública, permitiendo acceso');
     return NextResponse.next();
   }
 
@@ -23,6 +26,7 @@ export async function middleware(request: NextRequest) {
 
   // Permitir acceso a rutas de autenticación específicas sin verificar
   if (pathname === '/api/auth/login' || pathname === '/api/auth/logout') {
+    console.log('✅ Ruta de auth, permitiendo acceso');
     return NextResponse.next();
   }
 
@@ -30,12 +34,15 @@ export async function middleware(request: NextRequest) {
   const user = await isAuthenticated(request);
 
   if (!user) {
+    console.log('❌ Usuario no autenticado, redirigiendo a login');
     // Redirigir a login si no está autenticado
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = `?redirect=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(url);
   }
+
+  console.log('✅ Usuario autenticado:', user.username);
 
   // Agregar información del usuario a las headers para uso en las páginas
   const response = NextResponse.next();

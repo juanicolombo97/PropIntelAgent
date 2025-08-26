@@ -35,11 +35,34 @@ export function useAuth() {
 
   const logout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      console.log('🚪 Iniciando logout...');
+      
+      // Llamar al endpoint de logout
+      const response = await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include'
+      });
+      
+      console.log('✅ Logout response:', response.status);
+      
+      // Limpiar el estado del usuario
       setUser(null);
+      
+      // Intentar redirección con router
+      console.log('🔄 Redirigiendo a /login...');
       router.push('/login');
+      
+      // Fallback: si después de 1 segundo no se redirigió, usar window.location
+      setTimeout(() => {
+        console.log('⏰ Timeout de redirección, usando window.location');
+        window.location.href = '/login';
+      }, 1000);
+      
     } catch (error) {
-      console.error('Error al cerrar sesión:', error);
+      console.error('💥 Error al cerrar sesión:', error);
+      // Fallback inmediato en caso de error
+      setUser(null);
+      window.location.href = '/login';
     }
   };
 
