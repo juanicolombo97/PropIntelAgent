@@ -20,24 +20,33 @@ function LoginForm() {
     searchParams: Object.fromEntries(searchParams.entries())
   });
 
-  useEffect(() => {
-    // Verificar si ya está autenticado
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-          // Ya está autenticado, redirigir
-          console.log('🔄 Already authenticated, redirecting to:', redirectTo);
-          router.push(redirectTo);
-        }
-      } catch (error) {
-        // No autenticado, continuar en login
-        console.log('🔐 Not authenticated, staying on login page');
-      }
-    };
-
-    checkAuth();
-  }, [router, redirectTo]);
+          useEffect(() => {
+          // Verificar si ya está autenticado
+          const checkAuth = async () => {
+            try {
+              console.log('🔍 Checking authentication status...');
+              const response = await fetch('/api/auth/me');
+              console.log('🔍 Auth check response:', {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText
+              });
+              
+              if (response.ok) {
+                // Ya está autenticado, redirigir
+                console.log('🔄 Already authenticated, redirecting to:', redirectTo);
+                router.push(redirectTo);
+              } else {
+                console.log('🔐 Not authenticated, staying on login page');
+              }
+            } catch (error) {
+              // No autenticado, continuar en login
+              console.log('🔐 Auth check error:', error);
+            }
+          };
+      
+          checkAuth();
+        }, [router, redirectTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,25 +75,29 @@ function LoginForm() {
       const data = await response.json();
       console.log('📄 Login data:', data);
 
-      if (response.ok) {
-        console.log('✅ Login successful, redirecting to:', redirectTo);
-        // Login exitoso, redirigir
-        try {
-          await router.push(redirectTo);
-          console.log('🔄 Router.push completed');
-          
-          // Timeout de seguridad para forzar redirección si router no funciona
-          setTimeout(() => {
-            console.log('⏰ Redirect timeout, forcing navigation');
-            window.location.href = redirectTo;
-          }, 2000);
-          
-        } catch (redirectError) {
-          console.error('💥 Redirect error:', redirectError);
-          // Fallback: usar window.location
-          window.location.href = redirectTo;
-        }
-      } else {
+                   if (response.ok) {
+               console.log('✅ Login successful, redirecting to:', redirectTo);
+               
+               // Verificar cookies después del login
+               console.log('🍪 Cookies after login:', document.cookie);
+               
+               // Login exitoso, redirigir
+               try {
+                 await router.push(redirectTo);
+                 console.log('🔄 Router.push completed');
+                 
+                 // Timeout de seguridad para forzar redirección si router no funciona
+                 setTimeout(() => {
+                   console.log('⏰ Redirect timeout, forcing navigation');
+                   window.location.href = redirectTo;
+                 }, 2000);
+                 
+               } catch (redirectError) {
+                 console.error('💥 Redirect error:', redirectError);
+                 // Fallback: usar window.location
+                 window.location.href = redirectTo;
+               }
+             } else {
         console.log('❌ Login failed:', data.error);
         setError(data.error || 'Error de autenticación');
       }

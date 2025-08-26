@@ -53,16 +53,20 @@ async function handleRequest(
       body = await request.text();
     }
     
-    // Obtener el token JWT de las cookies
-    const authToken = request.cookies.get('auth-token')?.value;
-    
-    console.log('🔍 Debug proxy:', {
-      hasAuthToken: !!authToken,
-      tokenLength: authToken?.length,
-      tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : 'none',
-      targetUrl,
-      method
-    });
+               // Obtener el token JWT de las cookies
+           const authToken = request.cookies.get('auth-token')?.value;
+           
+           // Log todas las cookies para debug
+           const allCookies = request.cookies.getAll();
+           console.log('🍪 All cookies in proxy:', allCookies.map(c => ({ name: c.name, value: c.value ? 'present' : 'empty' })));
+           
+           console.log('🔍 Debug proxy:', {
+             hasAuthToken: !!authToken,
+             tokenLength: authToken?.length,
+             tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : 'none',
+             targetUrl,
+             method
+           });
     
     // Preparar headers
     const headers: Record<string, string> = {
