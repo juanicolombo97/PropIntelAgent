@@ -16,6 +16,8 @@ import {
 
 export default function Dashboard() {
   console.log('🚀 Dashboard component loaded');
+  console.log('🍪 Cookies en dashboard:', document.cookie);
+  console.log('📍 URL actual:', window.location.href);
   
   const [loading, setLoading] = useState(true);
   const [keyMetrics, setKeyMetrics] = useState([
