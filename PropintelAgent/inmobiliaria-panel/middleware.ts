@@ -16,9 +16,13 @@ export async function middleware(request: NextRequest) {
   // Permitir acceso a archivos estáticos
   if (
     pathname.startsWith('/_next/') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/api/auth/')
+    pathname.startsWith('/favicon.ico')
   ) {
+    return NextResponse.next();
+  }
+
+  // Permitir acceso a rutas de autenticación sin verificar
+  if (pathname.startsWith('/api/auth/')) {
     return NextResponse.next();
   }
 
