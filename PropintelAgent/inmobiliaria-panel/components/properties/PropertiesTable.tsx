@@ -1,4 +1,5 @@
 import { Property } from '@/lib/types';
+import { Admin } from '@/lib/api';
 import { Table, TableHeader, TableRow, TableCell, TableHeaderCell } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Card } from '@/components/ui/Card';

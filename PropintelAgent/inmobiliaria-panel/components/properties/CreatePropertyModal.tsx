@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Admin } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Plus, X, Upload, MapPin, Home, FileText } from 'lucide-react';
