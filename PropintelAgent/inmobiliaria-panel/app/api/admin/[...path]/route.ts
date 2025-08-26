@@ -56,6 +56,14 @@ async function handleRequest(
     // Obtener el token JWT de las cookies
     const authToken = request.cookies.get('auth-token')?.value;
     
+    console.log('🔍 Debug proxy:', {
+      hasAuthToken: !!authToken,
+      tokenLength: authToken?.length,
+      tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : 'none',
+      targetUrl,
+      method
+    });
+    
     // Preparar headers
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -66,6 +74,9 @@ async function handleRequest(
     // Agregar el token JWT si existe
     if (authToken) {
       headers['Authorization'] = `Bearer ${authToken}`;
+      console.log('✅ Token agregado al header Authorization');
+    } else {
+      console.log('❌ No se encontró token en las cookies');
     }
 
     // Hacer la petición al backend
