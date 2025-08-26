@@ -71,7 +71,9 @@ TWILIO_PHONE_NUMBER=your_twilio_number
 # Configuración
 MIN_MATCH_SCORE=0.7
 MAX_PROPERTIES_TO_SHOW=3
-```
+
+# Admin Panel
+ADMIN_API_KEY=your_admin_api_key_here
 
 ## 🏃‍♂️ Desarrollo Local
 

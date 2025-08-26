@@ -1,0 +1,104 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const API_BASE = 'https://rmys43m4av7y4kptnnvacfsmu40olhvq.lambda-url.us-east-2.on.aws';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { path: string[] } }
+) {
+  return handleRequest(request, params, 'GET');
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: { path: string[] } }
+) {
+  return handleRequest(request, params, 'POST');
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { path: string[] } }
+) {
+  return handleRequest(request, params, 'PUT');
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { path: string[] } }
+) {
+  return handleRequest(request, params, 'DELETE');
+}
+
+async function handleRequest(
+  request: NextRequest,
+  params: { path: string[] },
+  method: string
+) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const pathString = params.path.join('/');
+    const queryString = searchParams.toString();
+    
+    // Construir la URL de destino
+    const targetUrl = `${API_BASE}/admin/${pathString}${queryString ? `?${queryString}` : ''}`;
+    
+    // Obtener el body si existe
+    let body: string | undefined;
+    if (method !== 'GET' && method !== 'DELETE') {
+      body = await request.text();
+    }
+    
+    // Hacer la petición al backend con la API key
+    const response = await fetch(targetUrl, {
+      method,
+      headers: {
+        'x-api-key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || '',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Backend error:', response.status, errorText);
+      return NextResponse.json(
+        { error: `Backend error: ${response.status} ${response.statusText}` },
+        { status: response.status }
+      );
+    }
+    
+    const data = await response.json();
+    
+    // Devolver la respuesta con headers CORS apropiados
+    return NextResponse.json(data, {
+      status: response.status,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+        'Content-Type': 'application/json',
+      },
+    });
+    
+  } catch (error) {
+    console.error('Proxy error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// Manejar OPTIONS requests para CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-api-key',
+    },
+  });
+}
