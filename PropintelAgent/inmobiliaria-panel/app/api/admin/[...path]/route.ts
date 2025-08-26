@@ -53,14 +53,25 @@ async function handleRequest(
       body = await request.text();
     }
     
-    // Hacer la petición al backend con la API key
+    // Obtener el token JWT de las cookies
+    const authToken = request.cookies.get('auth-token')?.value;
+    
+    // Preparar headers
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'x-api-key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || '',
+    };
+
+    // Agregar el token JWT si existe
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    // Hacer la petición al backend
     const response = await fetch(targetUrl, {
       method,
-      headers: {
-        'x-api-key': process.env.NEXT_PUBLIC_ADMIN_API_KEY || '',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers,
       body,
     });
     
