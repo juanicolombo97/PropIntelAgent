@@ -110,11 +110,7 @@ function LoginForm() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
-            <p>Credenciales por defecto:</p>
-            <p><strong>Usuario:</strong> admin</p>
-            <p><strong>Contraseña:</strong> admin123</p>
-          </div>
+    
         </div>
       </Card>
     </div>
