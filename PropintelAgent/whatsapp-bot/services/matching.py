@@ -41,12 +41,45 @@ def find_matches(lead: Dict[str, Any], t_props, limit: int = 3) -> List[Dict[str
     return result 
 
 def format_props_sms(props: List[Dict[str, Any]]) -> str:
+    """
+    Formatea las propiedades de manera más atractiva y legible para WhatsApp.
+    """
     lines = []
-    for p in props:
-        t = p.get("Title", "")
-        n = p.get("Neighborhood", "")
-        r = p.get("Rooms", "?")
-        pr = p.get("Price", "?")
+    for i, p in enumerate(props, 1):
+        title = p.get("Title", "Propiedad sin título")
+        neighborhood = p.get("Neighborhood", "Zona no especificada")
+        rooms = p.get("Rooms", "?")
+        price = p.get("Price", "Consultar precio")
         url = p.get("URL", "")
-        lines.append(f"• {t} – {n} – {r} amb – ${pr} {('→ '+url) if url else ''}")
-    return "\n".join(lines)
+        
+        # Formatear precio
+        if isinstance(price, (int, float)) and price > 0:
+            if price >= 1000000:
+                price_str = f"${price/1000000:.1f}M"
+            elif price >= 1000:
+                price_str = f"${price/1000:.0f}k"
+            else:
+                price_str = f"${price:,.0f}"
+        else:
+            price_str = "💰 Consultar"
+        
+        # Formatear ambientes
+        if isinstance(rooms, (int, float)):
+            if rooms == 1:
+                rooms_str = "1 ambiente"
+            else:
+                rooms_str = f"{int(rooms)} ambientes"
+        else:
+            rooms_str = "Ambientes a consultar"
+        
+        # Construir línea
+        line = f"*{i}.* 🏠 *{title}*\n"
+        line += f"   📍 {neighborhood}\n"
+        line += f"   🛏️ {rooms_str} • {price_str}"
+        
+        if url:
+            line += f"\n   🔗 Ver más: {url}"
+        
+        lines.append(line)
+    
+    return "\n\n".join(lines)
