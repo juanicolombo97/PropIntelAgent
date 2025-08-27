@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': API_CONFIG.ADMIN_API_KEY,
         }
       });
 
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'x-api-key': API_CONFIG.ADMIN_API_KEY,
           }
         });
 
@@ -41,39 +43,37 @@ export async function GET(request: NextRequest) {
           leadInfo = await leadResponse.json();
         }
 
+        console.log('✅ Historial obtenido del bot real para:', phoneNumber, data);
         return NextResponse.json({
           success: true,
-          history: data.items || [],
+          history: (data.items || [])
+            .sort((a: any, b: any) => parseInt(a.Timestamp) - parseInt(b.Timestamp))
+            .map((msg: any) => ({
+              role: msg.Direction === 'out' ? 'assistant' : 'user',
+              content: msg.Text
+            })),
           leadInfo: leadInfo
         });
+      } else {
+        console.log('❌ Error del bot real:', response.status, response.statusText);
+        throw new Error(`Bot real respondió con ${response.status}`);
       }
     } catch (error) {
-      console.log('Bot real no disponible, usando datos de ejemplo:', error.message);
-    }
-
-    // Fallback: datos de ejemplo
-    return NextResponse.json({
-      success: true,
-      history: [
-        {
-          role: 'user',
-          content: 'Hola buenas'
-        },
-        {
-          role: 'assistant', 
-          content: 'Para ayudarte mejor, me decis si estás buscando para alquilar o comprar?'
+      console.log('❌ Bot real no disponible:', (error as Error).message);
+      // Devolver lista vacía en lugar de datos de ejemplo
+      return NextResponse.json({
+        success: true,
+        history: [],
+        leadInfo: {
+          LeadId: phoneNumber,
+          Status: 'NEW',
+          Intent: null,
+          Rooms: null,
+          Budget: null,
+          Neighborhood: null
         }
-      ],
-      leadInfo: {
-        LeadId: phoneNumber,
-        Status: 'NEW',
-        Intent: null,
-        Rooms: null,
-        Budget: null,
-        Neighborhood: null,
-        Missing: ['Intent', 'Rooms', 'Budget', 'Neighborhood']
-      }
-    });
+      });
+    }
 
   } catch (error) {
     console.error('Error en bot conversation-history:', error);

@@ -3,6 +3,9 @@ import Link from 'next/link';
 import { LeadProfile } from '@/components/leads/LeadProfile';
 import { MessagesList } from '@/components/leads/MessagesList';
 import { VisitsTable } from '@/components/leads/VisitsTable';
+import { ChatSection } from '@/components/leads/ChatSection';
+import { SuggestedProperties } from '@/components/leads/SuggestedProperties';
+import { LeadActivity } from '@/components/leads/LeadActivity';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ArrowLeft, User, MessageSquare, Calendar, Phone, MapPin, DollarSign } from 'lucide-react';
@@ -129,13 +132,20 @@ export default async function LeadDetail({ params }: { params: { id: string } })
           {/* Left Column */}
           <div className="space-y-6">
             <LeadProfile lead={lead} />
-            <VisitsTable visits={visits.items || []} />
+            <LeadActivity lead={lead} messages={messages.items || []} visits={visits.items || []} />
           </div>
           
           {/* Right Column */}
           <div className="space-y-6">
-            <MessagesList messages={messages.items || []} />
+            <ChatSection leadId={leadId} messages={messages.items || []} />
+            <SuggestedProperties lead={lead} />
           </div>
+        </div>
+
+        {/* Additional Sections */}
+        <div className="space-y-6">
+          <VisitsTable visits={visits.items || []} />
+          <MessagesList messages={messages.items || []} />
         </div>
 
         {/* Action Buttons */}

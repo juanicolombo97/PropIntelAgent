@@ -26,12 +26,25 @@ interface LeadInfo {
 export default function BotSimulatorPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('demo_user_001');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [leadInfo, setLeadInfo] = useState<LeadInfo | null>(null);
   const [existingLeads, setExistingLeads] = useState<any[]>([]);
   const [showLeadSelector, setShowLeadSelector] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const showLoading = (message: string) => {
+    setLoadingMessage(message);
+    setShowLoadingModal(true);
+  };
+
+  const hideLoading = () => {
+    setShowLoadingModal(false);
+    setLoadingMessage('');
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -62,8 +75,31 @@ export default function BotSimulatorPage() {
     loadExistingLeads();
   }, []);
 
+  // Efecto para limpiar conversación cuando cambia el número de teléfono
+  useEffect(() => {
+    // Solo limpiar si ya hay un número de teléfono (no en la carga inicial)
+    if (phoneNumber) {
+      // Limpiar conversación cuando cambia el número de teléfono
+      setMessages([]);
+      setLeadInfo(null);
+      setCurrentMessage('');
+      
+      // Mostrar notificación
+      setShowNotification(true);
+      setTimeout(() => {
+        setShowNotification(false);
+      }, 3000);
+    }
+  }, [phoneNumber]);
+
   const sendMessage = async () => {
     if (!currentMessage.trim() || isLoading) return;
+    
+    // Validar que se haya ingresado un número de teléfono
+    if (!phoneNumber.trim()) {
+      alert('Por favor, ingresa un número de teléfono antes de enviar un mensaje');
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -146,6 +182,7 @@ export default function BotSimulatorPage() {
 
   const loadExistingLeads = async () => {
     try {
+      showLoading('Cargando usuarios existentes...');
       const response = await fetch('/api/bot/leads');
       
       if (response.ok) {
@@ -154,19 +191,33 @@ export default function BotSimulatorPage() {
       }
     } catch (error) {
       console.error('Error cargando leads:', error);
+    } finally {
+      hideLoading();
     }
   };
 
   const selectExistingLead = async (leadId: string) => {
     setPhoneNumber(leadId);
     setShowLeadSelector(false);
-    await loadConversationHistory();
+    // El useEffect se encargará de limpiar la conversación
+    // Luego cargamos el historial del usuario seleccionado
+    setTimeout(() => {
+      loadConversationHistory(leadId);
+    }, 100);
   };
 
-  const loadConversationHistory = async () => {
+  const loadConversationHistory = async (specificPhoneNumber?: string) => {
     try {
-      setIsLoading(true);
-      const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
+      const phoneToUse = specificPhoneNumber || phoneNumber;
+      
+      if (!phoneToUse) {
+        console.log('No hay número de teléfono para cargar historial');
+        return;
+      }
+      
+      showLoading('Cargando historial de conversación...');
+      
+      const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneToUse}`);
       
       if (!response.ok) {
         throw new Error('Error al cargar el historial');
@@ -190,9 +241,9 @@ export default function BotSimulatorPage() {
 
     } catch (error) {
       console.error('Error:', error);
+    } finally {
+      hideLoading();
     }
-
-    setIsLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -219,6 +270,29 @@ export default function BotSimulatorPage() {
         </div>
       </div>
 
+      {/* Notificación de conversación limpia */}
+      {showNotification && (
+        <div className="fixed top-4 right-4 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg animate-in slide-in-from-right duration-300">
+          <div className="flex items-center gap-2">
+            <RefreshCw size={16} />
+            <span>Conversación limpia - Nuevo número: {phoneNumber}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Loading */}
+      {showLoadingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 shadow-2xl max-w-sm w-full mx-4">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-lg font-medium text-gray-900">{loadingMessage}</p>
+              <p className="text-sm text-gray-500">Por favor espera...</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6" style={{ height: 'calc(100vh - 300px)' }}>
         {/* Panel de conversación */}
         <div className="lg:col-span-3">
@@ -241,20 +315,17 @@ export default function BotSimulatorPage() {
                 <div className="flex gap-2">
                   <Button
                     onClick={loadConversationHistory}
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
-                    disabled={isLoading}
                     className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                    title="Cargar historial"
                   >
                     <RefreshCw size={16} />
                   </Button>
                   <Button
                     onClick={clearConversation}
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     className="text-red-600 border-red-600 hover:bg-red-50"
-                    title="Limpiar conversación"
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -268,7 +339,7 @@ export default function BotSimulatorPage() {
                 <div className="text-center text-slate-500 mt-20">
                   <Bot size={48} className="mx-auto mb-4 text-slate-400" />
                   <p className="text-lg font-medium">¡Inicia una conversación!</p>
-                  <p className="text-sm">Escribe un mensaje para probar el bot inmobiliario</p>
+                  <p className="text-sm">Primero ingresa un número de teléfono y luego escribe un mensaje</p>
                 </div>
               ) : (
                 messages.map((message) => (
@@ -295,20 +366,6 @@ export default function BotSimulatorPage() {
                   </div>
                 ))
               )}
-              {isLoading && (
-                <div className="flex justify-start mb-3">
-                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                      <span className="text-xs text-slate-500">Gonzalo está escribiendo...</span>
-                    </div>
-                  </div>
-                </div>
-              )}
               <div ref={messagesEndRef} />
             </div>
 
@@ -327,7 +384,7 @@ export default function BotSimulatorPage() {
                 </div>
                 <Button
                   onClick={sendMessage}
-                  disabled={!currentMessage.trim() || isLoading}
+                  disabled={!currentMessage.trim() || !phoneNumber.trim() || isLoading}
                   className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-4 py-3 rounded-xl"
                 >
                   <Send size={18} />
@@ -353,11 +410,11 @@ export default function BotSimulatorPage() {
                 <Input
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Ej: demo_user_001"
+                  placeholder="Escribe un número o selecciona uno existente"
                   className="text-sm py-2"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Cambia el número para simular diferentes clientes
+                  Escribe un nuevo número o selecciona un usuario existente abajo
                 </p>
               </div>
               

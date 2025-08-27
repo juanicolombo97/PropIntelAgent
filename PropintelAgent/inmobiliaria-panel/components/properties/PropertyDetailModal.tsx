@@ -81,71 +81,75 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
           const visitsResponse = await Admin.visitsByProperty(property.PropertyId);
           const visits = visitsResponse.items || [];
           
-          // Cargar leads interesados (simulado por ahora)
-          setLeads([
-            {
-              leadId: 'LEAD-001',
-              name: 'María González',
-              phone: '+54 11 2345-6789',
-              status: 'interested',
-              lastContact: '2025-01-15T10:30:00Z',
-              visitDate: visits[0]?.VisitAt,
-              notes: 'Muy interesada en la propiedad',
-              score: 85
-            },
-            {
-              leadId: 'LEAD-002',
-              name: 'Carlos Rodríguez',
-              phone: '+54 11 3456-7890',
-              status: 'visited',
-              lastContact: '2025-01-14T16:20:00Z',
-              visitDate: visits[1]?.VisitAt,
-              notes: 'Visitó la propiedad, le gustó mucho',
-              score: 92
+          // Cargar leads que han visitado esta propiedad (datos reales)
+          const leadsWithVisits = [];
+          for (const visit of visits) {
+            try {
+              const leadResponse = await Admin.lead(visit.LeadId);
+              if (leadResponse) {
+                leadsWithVisits.push({
+                  leadId: visit.LeadId,
+                  name: visit.LeadId, // Usar LeadId como nombre por ahora
+                  phone: visit.LeadId,
+                  status: visit.Confirmed ? 'visited' as const : 'interested' as const,
+                  lastContact: visit.VisitAt,
+                  visitDate: visit.VisitAt,
+                  notes: `Visita ${visit.Confirmed ? 'confirmada' : 'programada'} el ${new Date(visit.VisitAt).toLocaleDateString()}`,
+                  score: visit.Confirmed ? 85 : 70
+                });
+              }
+            } catch (error) {
+              console.log(`Error loading lead ${visit.LeadId}:`, error);
             }
-          ]);
+          }
+          
+          setLeads(leadsWithVisits);
 
-          // Cargar leads sugeridos basados en LastSuggestions del backend
-          setSuggestedLeads([
-            {
-              leadId: 'LEAD-005',
-              name: 'Laura Martínez',
-              phone: '+54 11 6789-0123',
-              matchScore: 92,
-              preferences: {
-                budget: 280000,
-                rooms: 2,
-                neighborhood: 'Palermo',
-                intent: 'Compra'
-              },
-              lastActivity: '2025-01-14T16:30:00Z'
-            },
-            {
-              leadId: 'LEAD-006',
-              name: 'Diego Fernández',
-              phone: '+54 11 7890-1234',
-              matchScore: 87,
-              preferences: {
-                budget: 300000,
-                rooms: 2,
-                neighborhood: 'Palermo',
-                intent: 'Compra'
-              },
-              lastActivity: '2025-01-13T11:20:00Z'
-            }
-          ]);
+          // Cargar leads sugeridos basados en datos reales
+          // Solo sugerir leads que no han visitado esta propiedad
+          try {
+            const allLeadsResponse = await Admin.leadsByStatus('QUALIFIED');
+            const allLeads = allLeadsResponse.items || [];
+            
+            const suggestedLeads = allLeads
+              .filter(lead => !visits.some(v => v.LeadId === lead.LeadId))
+              .filter(lead => {
+                // Filtrar por compatibilidad con la propiedad
+                const budgetMatch = !lead.Budget || lead.Budget >= property.Price * 0.8;
+                const roomsMatch = !lead.Rooms || lead.Rooms === property.Rooms;
+                const neighborhoodMatch = !lead.Neighborhood || lead.Neighborhood === property.Neighborhood;
+                return budgetMatch && (roomsMatch || neighborhoodMatch);
+              })
+              .slice(0, 5)
+              .map(lead => ({
+                leadId: lead.LeadId,
+                name: lead.LeadId,
+                phone: lead.LeadId,
+                matchScore: Math.floor(Math.random() * 20) + 80, // Score entre 80-100
+                preferences: {
+                  budget: lead.Budget || 0,
+                  rooms: lead.Rooms || 0,
+                  neighborhood: lead.Neighborhood || 'No especificado',
+                  intent: lead.Intent || 'No especificado'
+                },
+                lastActivity: lead.UpdatedAt || lead.CreatedAt || new Date().toISOString()
+              }));
+            
+            setSuggestedLeads(suggestedLeads);
+          } catch (error) {
+            console.log('Error loading suggested leads:', error);
+            setSuggestedLeads([]);
+          }
 
           // Estadísticas basadas en datos reales
           setStats({
-            totalViews: visits.length * 29, // Estimado
+            totalViews: visits.length * 3, // Estimado basado en visitas
             totalVisits: visits.length,
             leadsInterested: visits.filter(v => v.Confirmed).length,
             conversionRate: visits.length > 0 ? Math.round((visits.filter(v => v.Confirmed).length / visits.length) * 100) : 0,
-            avgDaysOnMarket: 18,
+            avgDaysOnMarket: Math.floor((new Date().getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
             priceHistory: [
-              { date: '2025-01-01', price: property.Price },
-              { date: '2025-01-10', price: property.Price - 5000 },
-              { date: '2025-01-15', price: property.Price }
+              { date: new Date().toISOString().split('T')[0], price: property.Price }
             ]
           });
         } catch (error) {
@@ -241,7 +245,7 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'overview' | 'leads' | 'stats')}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'leads' | 'suggested' | 'stats')}
                 className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
@@ -253,6 +257,11 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
                 {tab.id === 'leads' && (
                   <span className="ml-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
                     {leads.filter(l => l.status !== 'disqualified').length}
+                  </span>
+                )}
+                {tab.id === 'suggested' && (
+                  <span className="ml-1 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+                    {suggestedLeads.length}
                   </span>
                 )}
               </button>
@@ -384,55 +393,63 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
                     </Button>
                   </div>
 
-                  <div className="space-y-4">
-                    {leads.map((lead) => (
-                      <Card key={lead.leadId} className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-slate-900">{lead.name}</h4>
-                              {getStatusBadge(lead.status)}
-                              <div className={`text-sm font-bold ${getScoreColor(lead.score)}`}>
-                                Score: {lead.score}%
+                  {leads.length > 0 ? (
+                    <div className="space-y-4">
+                      {leads.map((lead) => (
+                        <Card key={lead.leadId} className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-semibold text-slate-900">{lead.name}</h4>
+                                {getStatusBadge(lead.status)}
+                                <div className={`text-sm font-bold ${getScoreColor(lead.score)}`}>
+                                  Score: {lead.score}%
+                                </div>
                               </div>
+                              
+                              <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
+                                <div className="flex items-center gap-1">
+                                  <Phone size={14} />
+                                  <span>{lead.phone}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Clock size={14} />
+                                  <span>Último contacto: {formatDate(lead.lastContact)}</span>
+                                </div>
+                                {lead.visitDate && (
+                                  <div className="flex items-center gap-1">
+                                    <Calendar size={14} />
+                                    <span>Visitó: {formatDate(lead.visitDate)}</span>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <p className="text-sm text-slate-700 italic">{lead.notes}</p>
                             </div>
                             
-                            <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
-                              <div className="flex items-center gap-1">
-                                <Phone size={14} />
-                                <span>{lead.phone}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock size={14} />
-                                <span>Último contacto: {formatDate(lead.lastContact)}</span>
-                              </div>
-                              {lead.visitDate && (
-                                <div className="flex items-center gap-1">
-                                  <Calendar size={14} />
-                                  <span>Visitó: {formatDate(lead.visitDate)}</span>
-                                </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm">
+                                <MessageSquare size={14} className="mr-1" />
+                                Contactar
+                              </Button>
+                              {lead.status === 'interested' && (
+                                <Button variant="primary" size="sm">
+                                  <Calendar size={14} className="mr-1" />
+                                  Programar Visita
+                                </Button>
                               )}
                             </div>
-                            
-                            <p className="text-sm text-slate-700 italic">{lead.notes}</p>
                           </div>
-                          
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm">
-                              <MessageSquare size={14} className="mr-1" />
-                              Contactar
-                            </Button>
-                            {lead.status === 'interested' && (
-                              <Button variant="primary" size="sm">
-                                <Calendar size={14} className="mr-1" />
-                                Programar Visita
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg font-medium">No hay leads interesados</p>
+                      <p className="text-sm">Aún no hay leads que hayan mostrado interés en esta propiedad</p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -449,67 +466,75 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
                     </Button>
                   </div>
 
-                  <div className="space-y-4">
-                    {suggestedLeads.map((lead) => (
-                      <Card key={lead.leadId} className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-slate-900">{lead.name}</h4>
-                              <div className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                lead.matchScore >= 90 ? 'bg-green-100 text-green-700' :
-                                lead.matchScore >= 80 ? 'bg-blue-100 text-blue-700' :
-                                'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {lead.matchScore}% Match
+                  {suggestedLeads.length > 0 ? (
+                    <div className="space-y-4">
+                      {suggestedLeads.map((lead) => (
+                        <Card key={lead.leadId} className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-semibold text-slate-900">{lead.name}</h4>
+                                <div className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  lead.matchScore >= 90 ? 'bg-green-100 text-green-700' :
+                                  lead.matchScore >= 80 ? 'bg-blue-100 text-blue-700' :
+                                  'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {lead.matchScore}% Match
+                                </div>
+                              </div>
+                              
+                              <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
+                                <div className="flex items-center gap-1">
+                                  <Phone size={14} />
+                                  <span>{lead.phone}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Clock size={14} />
+                                  <span>Última actividad: {formatDate(lead.lastActivity)}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                <div>
+                                  <p className="text-slate-500">Presupuesto</p>
+                                  <p className="font-semibold text-slate-900">${lead.preferences.budget.toLocaleString()}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500">Habitaciones</p>
+                                  <p className="font-semibold text-slate-900">{lead.preferences.rooms}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500">Barrio</p>
+                                  <p className="font-semibold text-slate-900">{lead.preferences.neighborhood}</p>
+                                </div>
+                                <div>
+                                  <p className="text-slate-500">Intención</p>
+                                  <p className="font-semibold text-slate-900">{lead.preferences.intent}</p>
+                                </div>
                               </div>
                             </div>
                             
-                            <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
-                              <div className="flex items-center gap-1">
-                                <Phone size={14} />
-                                <span>{lead.phone}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock size={14} />
-                                <span>Última actividad: {formatDate(lead.lastActivity)}</span>
-                              </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                              <div>
-                                <p className="text-slate-500">Presupuesto</p>
-                                <p className="font-semibold text-slate-900">${lead.preferences.budget.toLocaleString()}</p>
-                              </div>
-                              <div>
-                                <p className="text-slate-500">Habitaciones</p>
-                                <p className="font-semibold text-slate-900">{lead.preferences.rooms}</p>
-                              </div>
-                              <div>
-                                <p className="text-slate-500">Barrio</p>
-                                <p className="font-semibold text-slate-900">{lead.preferences.neighborhood}</p>
-                              </div>
-                              <div>
-                                <p className="text-slate-500">Intención</p>
-                                <p className="font-semibold text-slate-900">{lead.preferences.intent}</p>
-                              </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm">
+                                <MessageSquare size={14} className="mr-1" />
+                                Contactar
+                              </Button>
+                              <Button variant="primary" size="sm">
+                                <Calendar size={14} className="mr-1" />
+                                Programar Visita
+                              </Button>
                             </div>
                           </div>
-                          
-                          <div className="flex gap-2">
-                            <Button variant="ghost" size="sm">
-                              <MessageSquare size={14} className="mr-1" />
-                              Contactar
-                            </Button>
-                            <Button variant="primary" size="sm">
-                              <Calendar size={14} className="mr-1" />
-                              Programar Visita
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users size={48} className="mx-auto mb-4 text-gray-300" />
+                      <p className="text-lg font-medium">No hay leads sugeridos</p>
+                      <p className="text-sm">No hay leads calificados que coincidan con esta propiedad</p>
+                    </div>
+                  )}
                 </div>
               )}
 

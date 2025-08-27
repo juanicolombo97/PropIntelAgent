@@ -53,6 +53,7 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
                   <Link 
                     href={`/leads/${encodeURIComponent(lead.LeadId)}`}
                     className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     {lead.LeadId}
                   </Link>
