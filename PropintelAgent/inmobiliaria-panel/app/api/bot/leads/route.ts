@@ -7,33 +7,45 @@ export async function GET(request: NextRequest) {
     const BOT_WEBHOOK_URL = API_CONFIG.LAMBDA_API_URL;
     
     try {
-      const response = await fetch(`${BOT_WEBHOOK_URL}/admin/leads`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+      // Obtener leads con diferentes statuses y combinarlos
+      const statuses = ['NEW', 'QUALIFIED', 'SCHEDULED', 'COMPLETED'];
+      let allLeads: any[] = [];
+      
+      for (const status of statuses) {
+        try {
+          const response = await fetch(`${BOT_WEBHOOK_URL}/admin/leads?status=${status}`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': API_CONFIG.ADMIN_API_KEY,
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.items && data.items.length > 0) {
+              allLeads = [...allLeads, ...data.items];
+            }
+          }
+        } catch (error) {
+          console.log(`❌ Error obteniendo leads con status ${status}:`, (error as Error).message);
         }
+      }
+
+      console.log('✅ Leads obtenidos del bot real:', allLeads);
+      return NextResponse.json({
+        success: true,
+        leads: allLeads
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        return NextResponse.json({
-          success: true,
-          leads: data.items || []
-        });
-      }
     } catch (error) {
-      console.log('Bot real no disponible, usando datos de ejemplo:', error.message);
+      console.log('❌ Bot real no disponible:', (error as Error).message);
+      // Devolver lista vacía en lugar de datos de ejemplo
+      return NextResponse.json({
+        success: true,
+        leads: []
+      });
     }
-
-    // Fallback: datos de ejemplo
-    return NextResponse.json({
-      success: true,
-      leads: [
-        { LeadId: 'demo_user_001', Status: 'NEW', CreatedAt: '2024-01-15T10:00:00Z' },
-        { LeadId: 'test_user_002', Status: 'QUALIFIED', CreatedAt: '2024-01-14T15:30:00Z' },
-        { LeadId: '+54911234567', Status: 'NEW', CreatedAt: '2024-01-13T09:15:00Z' }
-      ]
-    });
 
   } catch (error) {
     console.error('Error obteniendo leads:', error);
