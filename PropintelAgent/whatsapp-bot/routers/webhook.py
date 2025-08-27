@@ -293,3 +293,5 @@ def get_lead_summary(phone_number: str):
     except Exception as e:
         print(f"❌ Error al obtener información del lead: {e}")
         return {}
+
+

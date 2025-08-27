@@ -1,0 +1,476 @@
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+import { MessageCircle, Send, Bot, User, Trash2, RefreshCw, Phone } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+
+interface Message {
+  id: string;
+  content: string;
+  sender: 'user' | 'bot';
+  timestamp: Date;
+}
+
+interface LeadInfo {
+  LeadId: string;
+  Status: string;
+  Intent: string | null;
+  Rooms: number | null;
+  Budget: number | null;
+  Neighborhood: string | null;
+  Missing?: string[];
+}
+
+export default function BotSimulatorPage() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [currentMessage, setCurrentMessage] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('demo_user_001');
+  const [isLoading, setIsLoading] = useState(false);
+  const [leadInfo, setLeadInfo] = useState<LeadInfo | null>(null);
+  const [existingLeads, setExistingLeads] = useState<any[]>([]);
+  const [showLeadSelector, setShowLeadSelector] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    // Hacer scroll al final cuando cambian los mensajes
+    if (messages.length > 0) {
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    // Hacer scroll cuando termina de cargar
+    if (!isLoading && messages.length > 0) {
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, messages.length]);
+
+  useEffect(() => {
+    // Cargar leads existentes al montar el componente
+    loadExistingLeads();
+  }, []);
+
+  const sendMessage = async () => {
+    if (!currentMessage.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: currentMessage,
+      sender: 'user',
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setCurrentMessage('');
+    setIsLoading(true);
+
+    try {
+      // Llamar al endpoint del bot
+      const response = await fetch('/api/bot/test-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone_number: phoneNumber,
+          message: currentMessage
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al comunicarse con el bot');
+      }
+
+      const data = await response.json();
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response,
+        sender: 'bot',
+        timestamp: new Date()
+      };
+
+              setMessages(prev => [...prev, botMessage]);
+        
+        // Actualizar información del lead
+        if (data.leadInfo) {
+          setLeadInfo(data.leadInfo);
+        }
+
+        // Recargar leads existentes para incluir el nuevo si es necesario
+        loadExistingLeads();
+
+    } catch (error) {
+      console.error('Error:', error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: 'Error: No se pudo procesar el mensaje. Verifica que el bot esté funcionando.',
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
+
+    setIsLoading(false);
+  };
+
+  const clearConversation = async () => {
+    try {
+      // Limpiar en el servidor
+      await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`, {
+        method: 'DELETE'
+      });
+      
+      // Limpiar en el cliente
+      setMessages([]);
+      setLeadInfo(null);
+    } catch (error) {
+      console.error('Error al limpiar conversación:', error);
+      // Limpiar en el cliente aunque falle el servidor
+      setMessages([]);
+      setLeadInfo(null);
+    }
+  };
+
+  const loadExistingLeads = async () => {
+    try {
+      const response = await fetch('/api/bot/leads');
+      
+      if (response.ok) {
+        const data = await response.json();
+        setExistingLeads(data.leads || []);
+      }
+    } catch (error) {
+      console.error('Error cargando leads:', error);
+    }
+  };
+
+  const selectExistingLead = async (leadId: string) => {
+    setPhoneNumber(leadId);
+    setShowLeadSelector(false);
+    await loadConversationHistory();
+  };
+
+  const loadConversationHistory = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar el historial');
+      }
+
+      const data = await response.json();
+      
+      // Convertir el historial a formato de mensajes
+      const historyMessages: Message[] = data.history.map((msg: any, index: number) => ({
+        id: index.toString(),
+        content: msg.content,
+        sender: msg.role === 'user' ? 'user' : 'bot',
+        timestamp: new Date()
+      }));
+
+      setMessages(historyMessages);
+      
+      if (data.leadInfo) {
+        setLeadInfo(data.leadInfo);
+      }
+
+    } catch (error) {
+      console.error('Error:', error);
+    }
+
+    setIsLoading(false);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Encabezado */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl">
+              <MessageCircle className="text-white" size={28} />
+            </div>
+            Simulador del Bot WhatsApp
+          </h1>
+          <p className="text-slate-600 mt-2">
+            Prueba el bot inmobiliario en tiempo real y ve cómo responde a diferentes mensajes
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6" style={{ height: 'calc(100vh - 300px)' }}>
+        {/* Panel de conversación */}
+        <div className="lg:col-span-3">
+          <Card className="h-full flex flex-col overflow-hidden">
+            {/* Header del chat */}
+            <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-xl flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="p-2 bg-green-500 rounded-full">
+                      <Bot className="text-white" size={22} />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white"></div>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 text-lg">Gonzalo</h3>
+                    <p className="text-sm text-slate-600">Agente Inmobiliario • En línea</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={loadConversationHistory}
+                    variant="outline"
+                    size="sm"
+                    disabled={isLoading}
+                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                    title="Cargar historial"
+                  >
+                    <RefreshCw size={16} />
+                  </Button>
+                  <Button
+                    onClick={clearConversation}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-600 hover:bg-red-50"
+                    title="Limpiar conversación"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Área de mensajes */}
+            <div className="overflow-y-auto p-6 bg-gradient-to-b from-slate-50 to-white chat-messages" style={{ height: 'calc(100vh - 450px)' }}>
+              {messages.length === 0 ? (
+                <div className="text-center text-slate-500 mt-20">
+                  <Bot size={48} className="mx-auto mb-4 text-slate-400" />
+                  <p className="text-lg font-medium">¡Inicia una conversación!</p>
+                  <p className="text-sm">Escribe un mensaje para probar el bot inmobiliario</p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
+                  >
+                    <div
+                      className={`max-w-[75%] px-4 py-3 rounded-2xl ${
+                        message.sender === 'user'
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
+                          : 'bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <p className="text-sm leading-relaxed">{message.content}</p>
+                        <p className={`text-xs ${
+                          message.sender === 'user' ? 'text-blue-200' : 'text-slate-500'
+                        }`}>
+                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+              {isLoading && (
+                <div className="flex justify-start mb-3">
+                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                      <span className="text-xs text-slate-500">Gonzalo está escribiendo...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input para enviar mensajes */}
+            <div className="p-4 border-t border-slate-200 bg-white rounded-b-xl flex-shrink-0 sticky bottom-0">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <Input
+                    value={currentMessage}
+                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Escribe un mensaje como cliente..."
+                    disabled={isLoading}
+                    className="w-full text-base py-3 px-4 rounded-xl border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+                <Button
+                  onClick={sendMessage}
+                  disabled={!currentMessage.trim() || isLoading}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-4 py-3 rounded-xl"
+                >
+                  <Send size={18} />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Panel de información del lead */}
+        <div className="flex flex-col space-y-3" style={{ height: 'calc(100vh - 300px)' }}>
+          {/* Configuración */}
+          <Card className="p-3 flex-shrink-0">
+            <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+              <Phone size={16} className="text-blue-500" />
+              Configuración
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Número de teléfono
+                </label>
+                <Input
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Ej: demo_user_001"
+                  className="text-sm py-2"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Cambia el número para simular diferentes clientes
+                </p>
+              </div>
+              
+              <div>
+                <button
+                  onClick={() => setShowLeadSelector(!showLeadSelector)}
+                  className="w-full text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg transition-colors"
+                >
+                  {showLeadSelector ? 'Ocultar' : 'Ver'} usuarios existentes ({existingLeads.length})
+                </button>
+                
+                {showLeadSelector && (
+                  <div className="mt-2 space-y-1 max-h-32 overflow-y-auto">
+                    {existingLeads.map((lead) => (
+                      <button
+                        key={lead.LeadId}
+                        onClick={() => selectExistingLead(lead.LeadId)}
+                        className={`w-full text-left text-xs px-2 py-1 rounded transition-colors ${
+                          lead.LeadId === phoneNumber
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="truncate">{lead.LeadId}</span>
+                          <span className={`px-1 py-0.5 rounded text-xs ${
+                            lead.Status === 'QUALIFIED' 
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {lead.Status}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* Información del Lead */}
+          <Card className="p-3 flex-1">
+            <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+              <User size={16} className="text-green-500" />
+              Información del Lead
+            </h3>
+            
+            {leadInfo ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-slate-500 mb-1">Estado</p>
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                      leadInfo.Status === 'QUALIFIED' 
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {leadInfo.Status}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <p className="text-slate-500 mb-1">Intención</p>
+                    <p className="font-medium">{leadInfo.Intent || 'No definida'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-slate-500 mb-1">Zona</p>
+                    <p className="font-medium">{leadInfo.Neighborhood || 'No definida'}</p>
+                  </div>
+                  
+                  <div>
+                    <p className="text-slate-500 mb-1">Ambientes</p>
+                    <p className="font-medium">{leadInfo.Rooms || 'No definido'}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <p className="text-slate-500 mb-1">Presupuesto</p>
+                  <p className="font-medium">
+                    {leadInfo.Budget 
+                      ? `$${leadInfo.Budget.toLocaleString()}`
+                      : 'No definido'
+                    }
+                  </p>
+                </div>
+
+                {leadInfo.Missing && leadInfo.Missing.length > 0 && (
+                  <div>
+                    <p className="text-slate-500 mb-1">Datos faltantes</p>
+                    <div className="flex flex-wrap gap-1">
+                      {leadInfo.Missing.map((item, index) => (
+                        <span
+                          key={index}
+                          className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded-full"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center text-slate-500 py-4">
+                <User size={20} className="mx-auto mb-1 text-slate-400" />
+                <p className="text-xs">Envía un mensaje para ver la información del lead</p>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

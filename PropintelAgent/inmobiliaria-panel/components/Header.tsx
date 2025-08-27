@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Home, Users, Building2, Calendar, BarChart3, Menu, X, LogOut, User } from 'lucide-react';
+import { Home, Users, Building2, Calendar, BarChart3, Menu, X, LogOut, User, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/lib/useAuth';
 import { Button } from '@/components/ui/Button';
 
@@ -64,6 +64,13 @@ export function Header() {
             >
               <BarChart3 size={16} className="group-hover:scale-110 transition-transform" />
               Estadísticas
+            </Link>
+            <Link 
+              href="/bot-simulator" 
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-white/50 transition-all duration-200 group"
+            >
+              <MessageCircle size={16} className="group-hover:scale-110 transition-transform" />
+              Bot Simulator
             </Link>
           </nav>
           
@@ -153,6 +160,14 @@ export function Header() {
               >
                 <BarChart3 size={18} className="group-hover:scale-110 transition-transform" />
                 Estadísticas
+              </Link>
+              <Link 
+                href="/bot-simulator" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-700 hover:text-slate-900 hover:bg-white/50 transition-all duration-200 group"
+              >
+                <MessageCircle size={18} className="group-hover:scale-110 transition-transform" />
+                Bot Simulator
               </Link>
               
               {/* Información de usuario y logout en móvil */}

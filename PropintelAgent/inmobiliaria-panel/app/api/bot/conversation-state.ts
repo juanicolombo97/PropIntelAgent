@@ -1,0 +1,87 @@
+// Estado global para mantener las conversaciones activas
+// En producción, esto estaría en una base de datos como Redis o DynamoDB
+
+interface ConversationState {
+  phoneNumber: string;
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+  }>;
+  leadInfo: {
+    LeadId: string;
+    Status: string;
+    Intent: string | null;
+    Rooms: number | null;
+    Budget: number | null;
+    Neighborhood: string | null;
+    Missing: string[];
+  };
+  lastActivity: Date;
+}
+
+// Almacén en memoria para las conversaciones
+const conversations = new Map<string, ConversationState>();
+
+// Limpiar conversaciones inactivas (más de 1 hora)
+setInterval(() => {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  for (const [phoneNumber, conversation] of conversations.entries()) {
+    if (conversation.lastActivity < oneHourAgo) {
+      conversations.delete(phoneNumber);
+    }
+  }
+}, 15 * 60 * 1000); // Ejecutar cada 15 minutos
+
+export function getConversation(phoneNumber: string): ConversationState {
+  let conversation = conversations.get(phoneNumber);
+  
+  if (!conversation) {
+    conversation = {
+      phoneNumber,
+      messages: [],
+      leadInfo: {
+        LeadId: phoneNumber,
+        Status: 'NEW',
+        Intent: null,
+        Rooms: null,
+        Budget: null,
+        Neighborhood: null,
+        Missing: ['Intent', 'Rooms', 'Budget', 'Neighborhood']
+      },
+      lastActivity: new Date()
+    };
+    conversations.set(phoneNumber, conversation);
+  }
+  
+  return conversation;
+}
+
+export function updateConversation(phoneNumber: string, updates: Partial<ConversationState>) {
+  const conversation = getConversation(phoneNumber);
+  Object.assign(conversation, updates);
+  conversation.lastActivity = new Date();
+  conversations.set(phoneNumber, conversation);
+}
+
+export function addMessage(phoneNumber: string, role: 'user' | 'assistant', content: string) {
+  const conversation = getConversation(phoneNumber);
+  conversation.messages.push({
+    role,
+    content,
+    timestamp: new Date()
+  });
+  conversation.lastActivity = new Date();
+  conversations.set(phoneNumber, conversation);
+}
+
+export function updateLeadInfo(phoneNumber: string, leadInfo: Partial<ConversationState['leadInfo']>) {
+  const conversation = getConversation(phoneNumber);
+  Object.assign(conversation.leadInfo, leadInfo);
+  conversation.lastActivity = new Date();
+  conversations.set(phoneNumber, conversation);
+}
+
+export function clearConversation(phoneNumber: string) {
+  conversations.delete(phoneNumber);
+}

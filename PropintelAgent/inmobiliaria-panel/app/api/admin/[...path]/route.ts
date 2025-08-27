@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { API_CONFIG } from '../../../../config/api';
 
-const API_BASE = 'https://rmys43m4av7y4kptnnvacfsmu40olhvq.lambda-url.us-east-2.on.aws';
+const API_BASE = API_CONFIG.LAMBDA_API_URL;
 
 export async function GET(
   request: NextRequest,
@@ -72,13 +73,13 @@ async function handleRequest(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'x-api-key': process.env.ADMIN_API_KEY || '',
+      'x-api-key': API_CONFIG.ADMIN_API_KEY,
     };
     
     console.log('🔑 API Key configurada:', {
-      hasApiKey: !!process.env.ADMIN_API_KEY,
-      apiKeyLength: process.env.ADMIN_API_KEY?.length,
-      apiKeyPreview: process.env.ADMIN_API_KEY ? `${process.env.ADMIN_API_KEY.substring(0, 10)}...` : 'none'
+      hasApiKey: !!API_CONFIG.ADMIN_API_KEY,
+      apiKeyLength: API_CONFIG.ADMIN_API_KEY?.length,
+      apiKeyPreview: API_CONFIG.ADMIN_API_KEY ? `${API_CONFIG.ADMIN_API_KEY.substring(0, 10)}...` : 'none'
     });
 
     // Agregar el token JWT si existe

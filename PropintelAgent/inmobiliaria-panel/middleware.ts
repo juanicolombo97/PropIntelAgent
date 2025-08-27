@@ -25,8 +25,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // Permitir acceso a rutas de autenticación específicas sin verificar
-  if (pathname === '/api/auth/login' || pathname === '/api/auth/logout') {
-    console.log('✅ Ruta de auth, permitiendo acceso');
+  if (pathname === '/api/auth/login' || pathname === '/api/auth/logout' || pathname.startsWith('/api/bot/')) {
+    console.log('✅ Ruta de auth o bot, permitiendo acceso');
+    return NextResponse.next();
+  }
+
+  // Permitir acceso a rutas del bot sin autenticación
+  if (pathname.startsWith('/api/bot/')) {
+    console.log('✅ Ruta del bot, permitiendo acceso');
     return NextResponse.next();
   }
 
