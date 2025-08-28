@@ -15,14 +15,17 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
+    "autoprefixer": "^10.4.21",
     "bcryptjs": "^2.4.3",
     "jose": "^5.2.0",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.541.0",
     "next": "15.5.0",
+    "postcss": "^8.5.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-redux": "^9.2.0"
+    "react-redux": "^9.2.0",
+    "tailwindcss": "^3.4.17"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -33,11 +36,8 @@
     "@types/react-dom": "^19",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.5.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.17",
     "typescript": "^5"
   }
 }
