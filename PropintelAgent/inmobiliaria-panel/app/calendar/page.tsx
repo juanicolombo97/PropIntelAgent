@@ -1,61 +1,62 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Admin } from '@/lib/api';
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
+import { fetchAllVisits } from '@/lib/slices/visitsSlice';
+import { fetchAllLeads as fetchLeads } from '@/lib/slices/leadsSlice';
+import { fetchAllProperties as fetchProps } from '@/lib/slices/propertiesSlice';
+import { 
+  setCreateModalOpen, 
+  setSelectedDate, 
+  goToPreviousMonth, 
+  goToNextMonth, 
+  goToToday 
+} from '@/lib/slices/calendarSlice';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, Home } from 'lucide-react';
-import { Visit, Lead, Property } from '@/lib/types';
 import { CreateVisitModal } from '@/components/calendar/CreateVisitModal';
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const dispatch = useAppDispatch();
+  const { currentDate: currentDateString, selectedDate, isCreateModalOpen } = useAppSelector(state => state.calendar);
+  const currentDate = new Date(currentDateString);
+  const { items: visits, loading: visitsLoading } = useAppSelector(state => state.visits);
+  const { items: leads, loading: leadsLoading } = useAppSelector(state => state.leads);
+  const { items: properties, loading: propertiesLoading } = useAppSelector(state => state.properties);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [visitsData, leadsData, propertiesData] = await Promise.all([
-        Admin.getAllVisits(),
-        Admin.getAllLeads(),
-        Admin.getAllProperties(),
-      ]);
-      
-      setVisits(visitsData.items || []);
-      setLeads(leadsData.items || []);
-      setProperties(propertiesData.items || []);
-    } catch (error) {
-      console.error('Error loading calendar data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Los datos se cargan automáticamente al inicializar la aplicación
+  // No necesitamos cargar datos aquí
 
   const handleVisitCreated = () => {
-    loadData();
+    dispatch(fetchAllVisits());
   };
 
   // Funciones para navegación del calendario
-  const goToPreviousMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const handlePreviousMonth = () => {
+    dispatch(goToPreviousMonth());
   };
 
-  const goToNextMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  const handleNextMonth = () => {
+    dispatch(goToNextMonth());
   };
 
-  const goToToday = () => {
-    setCurrentDate(new Date());
+  const handleToday = () => {
+    dispatch(goToToday());
+  };
+
+  const handleDayClick = (date: Date) => {
+    dispatch(setSelectedDate(date));
+    dispatch(setCreateModalOpen(true));
+  };
+
+  const handleCreateVisit = () => {
+    dispatch(setCreateModalOpen(true));
+  };
+
+  const handleCloseModal = () => {
+    dispatch(setCreateModalOpen(false));
+    dispatch(setSelectedDate(null));
   };
 
   // Generar días del mes
@@ -136,6 +137,7 @@ export default function CalendarPage() {
   };
 
   const days = getDaysInMonth(currentDate);
+  const loading = visitsLoading || leadsLoading || propertiesLoading;
 
   if (loading) {
     return (
@@ -149,7 +151,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -163,7 +165,7 @@ export default function CalendarPage() {
         </div>
         <Button 
           variant="primary"
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={handleCreateVisit}
           className="flex items-center gap-2"
         >
           <Plus size={18} />
@@ -171,28 +173,87 @@ export default function CalendarPage() {
         </Button>
       </div>
 
+      {/* Stats Cards - Movidos arriba */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Total Visitas</p>
+              <p className="text-xl font-bold text-slate-900">{visits.length}</p>
+            </div>
+            <Calendar size={20} className="text-blue-500" />
+          </div>
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Confirmadas</p>
+              <p className="text-xl font-bold text-slate-900">
+                {visits.filter(v => v.Confirmed).length}
+              </p>
+            </div>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Clock size={16} className="text-green-600" />
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Pendientes</p>
+              <p className="text-xl font-bold text-slate-900">
+                {visits.filter(v => !v.Confirmed).length}
+              </p>
+            </div>
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Clock size={16} className="text-yellow-600" />
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Este Mes</p>
+              <p className="text-xl font-bold text-slate-900">
+                {visits.filter(v => {
+                  const visitDate = new Date(v.VisitAt);
+                  return visitDate.getMonth() === currentDate.getMonth() && 
+                         visitDate.getFullYear() === currentDate.getFullYear();
+                }).length}
+              </p>
+            </div>
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Calendar size={16} className="text-purple-600" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
       {/* Calendar Navigation */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={goToPreviousMonth}>
+            <Button variant="ghost" onClick={handlePreviousMonth}>
               <ChevronLeft size={20} />
             </Button>
-            <h2 className="text-2xl font-bold text-slate-900">{formatDate(currentDate)}</h2>
-            <Button variant="ghost" onClick={goToNextMonth}>
+            <h2 className="text-xl font-bold text-slate-900">{formatDate(currentDate)}</h2>
+            <Button variant="ghost" onClick={handleNextMonth}>
               <ChevronRight size={20} />
             </Button>
           </div>
-          <Button variant="secondary" onClick={goToToday}>
+          <Button variant="secondary" onClick={handleToday}>
             Hoy
           </Button>
         </div>
 
-        {/* Calendar Grid */}
+        {/* Calendar Grid - Más compacto */}
         <div className="grid grid-cols-7 gap-1">
           {/* Day Headers */}
           {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
-            <div key={day} className="p-3 text-center font-semibold text-slate-600 text-sm">
+            <div key={day} className="p-2 text-center font-semibold text-slate-600 text-sm">
               {day}
             </div>
           ))}
@@ -205,7 +266,7 @@ export default function CalendarPage() {
             return (
               <div
                 key={index}
-                className={`min-h-[120px] p-2 border border-slate-200 cursor-pointer transition-colors ${
+                className={`min-h-[80px] p-1 border border-slate-200 cursor-pointer transition-colors ${
                   day.isCurrentMonth 
                     ? 'bg-white hover:bg-slate-50' 
                     : 'bg-slate-50 text-slate-400'
@@ -220,18 +281,17 @@ export default function CalendarPage() {
                 }`}
                 onClick={() => {
                   if (day.isCurrentMonth) {
-                    setSelectedDate(day.date);
-                    setIsCreateModalOpen(true);
+                    handleDayClick(day.date);
                   }
                 }}
               >
-                <div className="text-sm font-medium mb-1">
+                <div className="text-xs font-medium mb-1">
                   {day.date.getDate()}
                 </div>
                 
-                {/* Visits for this day */}
-                <div className="space-y-1">
-                  {dayVisits.slice(0, 2).map((visit) => {
+                {/* Visits for this day - Más compacto */}
+                <div className="space-y-0.5">
+                  {dayVisits.slice(0, 1).map((visit) => {
                     const lead = getLeadInfo(visit.LeadId);
                     const property = getPropertyInfo(visit.PropertyId);
                     
@@ -245,22 +305,19 @@ export default function CalendarPage() {
                         }`}
                       >
                         <div className="flex items-center gap-1">
-                          <Clock size={10} />
+                          <Clock size={8} />
                           {formatTime(visit.VisitAt)}
                         </div>
-                        <div className="truncate">
-                          {lead?.LeadId || 'Lead N/A'}
-                        </div>
-                        <div className="truncate text-xs opacity-75">
-                          {property?.Title || 'Propiedad N/A'}
+                        <div className="truncate text-xs">
+                          {lead?.LeadId?.slice(0, 8) || 'Lead N/A'}
                         </div>
                       </div>
                     );
                   })}
                   
-                  {dayVisits.length > 2 && (
+                  {dayVisits.length > 1 && (
                     <div className="text-xs text-slate-500 text-center">
-                      +{dayVisits.length - 2} más
+                      +{dayVisits.length - 1}
                     </div>
                   )}
                 </div>
@@ -270,72 +327,10 @@ export default function CalendarPage() {
         </div>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Total Visitas</p>
-              <p className="text-2xl font-bold text-slate-900">{visits.length}</p>
-            </div>
-            <Calendar size={24} className="text-blue-500" />
-          </div>
-        </Card>
-        
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Confirmadas</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {visits.filter(v => v.Confirmed).length}
-              </p>
-            </div>
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Clock size={20} className="text-green-600" />
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Pendientes</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {visits.filter(v => !v.Confirmed).length}
-              </p>
-            </div>
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock size={20} className="text-yellow-600" />
-            </div>
-          </div>
-        </Card>
-        
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-600">Este Mes</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {visits.filter(v => {
-                  const visitDate = new Date(v.VisitAt);
-                  return visitDate.getMonth() === currentDate.getMonth() && 
-                         visitDate.getFullYear() === currentDate.getFullYear();
-                }).length}
-              </p>
-            </div>
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Calendar size={20} className="text-purple-600" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
       {/* Create Visit Modal */}
       <CreateVisitModal
         isOpen={isCreateModalOpen}
-        onClose={() => {
-          setIsCreateModalOpen(false);
-          setSelectedDate(null);
-        }}
+        onClose={handleCloseModal}
         onVisitCreated={handleVisitCreated}
         selectedDate={selectedDate}
         leads={leads}
