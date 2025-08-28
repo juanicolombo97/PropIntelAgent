@@ -1,0 +1,13 @@
+# Vercel ignore file
+.DS_Store
+*.log
+node_modules
+.next
+out
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+scripts/
+test-deploy.md
+README.md

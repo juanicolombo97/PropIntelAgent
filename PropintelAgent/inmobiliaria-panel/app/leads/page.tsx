@@ -1,14 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../lib/hooks';
-import { fetchAllLeads } from '../../lib/slices/leadsSlice';
-import { LeadsTable } from '../../components/leads/LeadsTable';
-import { CreateLeadModal } from '../../components/leads/CreateLeadModal';
-import { LeadDetailModal } from '../../components/leads/LeadDetailModal';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
+import { fetchAllLeads } from '@/lib/slices/leadsSlice';
+import { LeadsTable } from '@/components/leads/LeadsTable';
+import { CreateLeadModal } from '@/components/leads/CreateLeadModal';
+import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { User, Plus, Filter, TrendingUp, DollarSign, MapPin } from 'lucide-react';
 
 export default function LeadsPage() {

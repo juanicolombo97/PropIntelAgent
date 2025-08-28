@@ -1,10 +1,10 @@
 'use client';
 
-import { useAppSelector } from '../lib/hooks';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import { useAppSelector } from '@/lib/hooks';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { 
   TrendingUp, 
   Users, 
