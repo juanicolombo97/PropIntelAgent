@@ -220,7 +220,9 @@ def list_visits(lead_id: str | None = None, property_id: str | None = None, limi
             Limit=limit
         )
         return {"items": dec_to_native(resp.get("Items", []))}
-    return {"items": []}
+    # Si no se especifica filtro, listar todas las visitas
+    resp = t_visits.scan(Limit=limit)
+    return {"items": dec_to_native(resp.get("Items", []))}
 
 @router.put("/visits/confirm")
 def confirm_visit(lead_id: str, visit_at: str, confirmed: bool = True, _: bool = Depends(verify_api_key)):

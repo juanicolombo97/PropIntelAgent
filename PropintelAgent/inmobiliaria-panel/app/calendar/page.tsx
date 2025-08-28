@@ -7,6 +7,7 @@ import { fetchAllProperties as fetchProps } from '@/lib/slices/propertiesSlice';
 import { 
   setCreateModalOpen, 
   setSelectedDate, 
+  setViewMode,
   goToPreviousMonth, 
   goToNextMonth, 
   goToToday 
@@ -14,21 +15,29 @@ import {
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, Home } from 'lucide-react';
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, Home, RefreshCw } from 'lucide-react';
 import { CreateVisitModal } from '@/components/calendar/CreateVisitModal';
 
 export default function CalendarPage() {
   const dispatch = useAppDispatch();
-  const { currentDate: currentDateString, selectedDate, isCreateModalOpen } = useAppSelector(state => state.calendar);
+  const { currentDate: currentDateString, selectedDate, isCreateModalOpen, viewMode } = useAppSelector(state => state.calendar);
   const currentDate = new Date(currentDateString);
   const { items: visits, loading: visitsLoading } = useAppSelector(state => state.visits);
   const { items: leads, loading: leadsLoading } = useAppSelector(state => state.leads);
   const { items: properties, loading: propertiesLoading } = useAppSelector(state => state.properties);
 
+  // Debug: Log los datos que llegan al calendario
+  console.log('📅 Calendar Page Data:', {
+    visits: { count: visits.length, loading: visitsLoading, items: visits },
+    leads: { count: leads.length, loading: leadsLoading },
+    properties: { count: properties.length, loading: propertiesLoading }
+  });
+
   // Los datos se cargan automáticamente al inicializar la aplicación
   // No necesitamos cargar datos aquí
 
   const handleVisitCreated = () => {
+    console.log('🔄 Recargando visitas después de crear una nueva...');
     dispatch(fetchAllVisits());
   };
 
@@ -47,7 +56,8 @@ export default function CalendarPage() {
 
   const handleDayClick = (date: Date) => {
     dispatch(setSelectedDate(date));
-    dispatch(setCreateModalOpen(true));
+    // Cambiar a vista de día
+    dispatch(setViewMode('day'));
   };
 
   const handleCreateVisit = () => {
@@ -56,7 +66,11 @@ export default function CalendarPage() {
 
   const handleCloseModal = () => {
     dispatch(setCreateModalOpen(false));
+  };
+
+  const handleClearSelection = () => {
     dispatch(setSelectedDate(null));
+    dispatch(setViewMode('month'));
   };
 
   // Generar días del mes
@@ -106,10 +120,23 @@ export default function CalendarPage() {
   // Obtener visitas para una fecha específica
   const getVisitsForDate = (date: Date) => {
     const dateString = date.toISOString().split('T')[0];
-    return visits.filter(visit => {
+    console.log('🗓️ Calendar Debug:', {
+      searchingForDate: dateString,
+      totalVisits: visits.length,
+      allVisits: visits.map(v => ({
+        id: v.LeadId,
+        visitAt: v.VisitAt,
+        parsedDate: new Date(v.VisitAt).toISOString().split('T')[0]
+      }))
+    });
+    
+    const filteredVisits = visits.filter(visit => {
       const visitDate = new Date(visit.VisitAt).toISOString().split('T')[0];
       return visitDate === dateString;
     });
+    
+    console.log('🗓️ Filtered visits for', dateString, ':', filteredVisits);
+    return filteredVisits;
   };
 
   // Obtener información del lead
@@ -163,15 +190,29 @@ export default function CalendarPage() {
             <p className="text-sm text-slate-600">Gestiona y programa visitas a propiedades</p>
           </div>
         </div>
-        <Button 
-          variant="primary"
-          onClick={handleCreateVisit}
-          className="flex items-center gap-2"
-          size="sm"
-        >
-          <Plus size={16} />
-          Nueva Visita
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="secondary"
+            onClick={() => {
+              console.log('🔄 Forzando recarga de visitas...');
+              dispatch(fetchAllVisits());
+            }}
+            className="flex items-center gap-2"
+            size="sm"
+          >
+            <RefreshCw size={16} />
+            Recargar Visitas
+          </Button>
+          <Button 
+            variant="primary"
+            onClick={handleCreateVisit}
+            className="flex items-center gap-2"
+            size="sm"
+          >
+            <Plus size={16} />
+            Nueva Visita
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards - Más compactos */}
@@ -234,7 +275,8 @@ export default function CalendarPage() {
       </div>
 
       {/* Calendar Navigation */}
-      <Card className="p-3">
+      {viewMode === 'month' && (
+        <Card className="p-3">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" onClick={handlePreviousMonth} size="sm">
@@ -326,6 +368,129 @@ export default function CalendarPage() {
           })}
         </div>
       </Card>
+      )}
+
+      {/* Vista de Día */}
+      {selectedDate && viewMode === 'day' && (
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-xl font-bold text-slate-900">
+                {selectedDate.toLocaleDateString('es-AR', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </h3>
+              <p className="text-sm text-slate-600">
+                {getVisitsForDate(selectedDate).length} visita{getVisitsForDate(selectedDate).length !== 1 ? 's' : ''} programada{getVisitsForDate(selectedDate).length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={handleClearSelection}
+                size="sm"
+              >
+                Volver al Mes
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleCreateVisit}
+                className="flex items-center gap-2"
+                size="sm"
+              >
+                <Plus size={16} />
+                Agregar Visita
+              </Button>
+            </div>
+          </div>
+
+          {/* Vista horaria del día */}
+          <div className="space-y-2">
+            {Array.from({ length: 24 }, (_, hour) => {
+              const hourVisits = getVisitsForDate(selectedDate).filter(visit => {
+                const visitHour = new Date(visit.VisitAt).getHours();
+                return visitHour === hour;
+              });
+
+              return (
+                <div key={hour} className="flex border-b border-slate-100 last:border-b-0">
+                  {/* Hora */}
+                  <div className="w-20 p-3 text-sm font-medium text-slate-600 bg-slate-50 flex-shrink-0">
+                    {hour.toString().padStart(2, '0')}:00
+                  </div>
+                  
+                  {/* Contenido de la hora */}
+                  <div className="flex-1 p-3 min-h-[60px]">
+                    {hourVisits.length === 0 ? (
+                      <div className="text-slate-400 text-sm">Sin eventos</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {hourVisits.map((visit) => {
+                          const lead = getLeadInfo(visit.LeadId);
+                          const property = getPropertyInfo(visit.PropertyId);
+                          const visitTime = new Date(visit.VisitAt);
+                          
+                          return (
+                            <div
+                              key={visit.VisitAt}
+                              className={`p-3 rounded-lg border ${
+                                visit.Confirmed 
+                                  ? 'bg-green-50 border-green-200' 
+                                  : 'bg-yellow-50 border-yellow-200'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-full ${
+                                    visit.Confirmed 
+                                      ? 'bg-green-100 text-green-600' 
+                                      : 'bg-yellow-100 text-yellow-600'
+                                  }`}>
+                                    <Clock size={14} />
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-slate-900">
+                                      {visitTime.toLocaleTimeString('es-AR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                    <p className="text-sm text-slate-600">
+                                      {lead?.LeadId || 'Lead no encontrado'} • {property?.Title || 'Propiedad no encontrada'}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    variant={visit.Confirmed ? 'success' : 'warning'}
+                                    size="sm"
+                                  >
+                                    {visit.Confirmed ? 'Confirmada' : 'Pendiente'}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {visit.Notes && (
+                                <div className="mt-2 pt-2 border-t border-slate-200">
+                                  <p className="text-sm text-slate-600">
+                                    <strong>Notas:</strong> {visit.Notes}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Create Visit Modal */}
       <CreateVisitModal
