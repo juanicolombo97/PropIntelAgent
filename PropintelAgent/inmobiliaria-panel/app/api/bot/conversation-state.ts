@@ -26,7 +26,8 @@ const conversations = new Map<string, ConversationState>();
 // Limpiar conversaciones inactivas (más de 1 hora)
 setInterval(() => {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  for (const [phoneNumber, conversation] of conversations.entries()) {
+  const entries = Array.from(conversations.entries());
+  for (const [phoneNumber, conversation] of entries) {
     if (conversation.lastActivity < oneHourAgo) {
       conversations.delete(phoneNumber);
     }
