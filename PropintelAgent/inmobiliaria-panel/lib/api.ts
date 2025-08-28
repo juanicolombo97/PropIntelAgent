@@ -120,8 +120,10 @@ export const Admin = {
   visitsByProperty: (property_id: string): Promise<ApiResponse<Visit>> =>
     req(`/admin/visits?property_id=${encodeURIComponent(property_id)}`),
     
-  getAllVisits: (): Promise<ApiResponse<Visit>> =>
-    req(`/admin/visits`),
+  getAllVisits: (): Promise<ApiResponse<Visit>> => {
+    console.log('🔍 Llamando a getAllVisits...');
+    return req(`/admin/visits`);
+  },
     
   createVisit: (visitData: {
     LeadId: string;

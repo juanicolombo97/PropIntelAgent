@@ -90,6 +90,7 @@ const visitsSlice = createSlice({
       .addCase(fetchAllVisits.fulfilled, (state, action) => {
         state.loading = false;
         state.items = action.payload;
+        console.log('✅ Visitas cargadas:', action.payload.length, 'items:', action.payload);
       })
       .addCase(fetchAllVisits.rejected, (state, action) => {
         state.loading = false;
@@ -126,12 +127,15 @@ const visitsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(createVisit.fulfilled, (state) => {
+      .addCase(createVisit.fulfilled, (state, action) => {
         state.loading = false;
+        console.log('✅ Visita creada, respuesta:', action.payload);
+        // Nota: Necesitamos hacer fetchAllVisits para actualizar la lista
       })
       .addCase(createVisit.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || 'Error al crear visita';
+        console.error('❌ Error creando visita:', action.error);
       })
       // confirmVisit
       .addCase(confirmVisit.pending, (state) => {
