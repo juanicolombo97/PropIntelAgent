@@ -97,7 +97,6 @@ export default function PropertiesPage() {
       <PropertiesTable 
         properties={properties} 
         onPropertyClick={handlePropertyClick}
-        loading={loading}
       />
 
       {/* Modals */}

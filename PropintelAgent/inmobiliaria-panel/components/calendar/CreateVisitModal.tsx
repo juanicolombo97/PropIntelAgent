@@ -198,7 +198,7 @@ export function CreateVisitModal({
                       <div className="text-sm text-green-700 space-y-1">
                         <p>Intención: {getSelectedLead()?.Intent || 'No especificada'}</p>
                         <p>Barrio: {getSelectedLead()?.Neighborhood || 'No especificado'}</p>
-                        <p>Presupuesto: {getSelectedLead()?.Budget ? `$${getSelectedLead()?.Budget.toLocaleString()}` : 'No especificado'}</p>
+                        <p>Presupuesto: {getSelectedLead()?.Budget ? `$${getSelectedLead()?.Budget?.toLocaleString()}` : 'No especificado'}</p>
                       </div>
                     </div>
                   </div>

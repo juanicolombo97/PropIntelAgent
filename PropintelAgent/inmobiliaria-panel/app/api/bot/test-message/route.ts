@@ -66,7 +66,7 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
         const xmlText = await response.text();
         
         // Extraer el mensaje de la respuesta XML
-        const messageMatch = xmlText.match(/<Message>(.*?)<\/Message>/s);
+        const messageMatch = xmlText.match(/<Message>([\s\S]*?)<\/Message>/);
         const reply = messageMatch ? messageMatch[1] : 'No se pudo procesar la respuesta';
         
         // Obtener información del lead desde la base de datos
@@ -88,7 +88,7 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
         };
       }
     } catch (error) {
-      console.log('Bot real no disponible, usando simulación:', error.message);
+      console.log('Bot real no disponible, usando simulación:', error instanceof Error ? error.message : String(error));
     }
     
     // Fallback: simulación si el bot real no está disponible
@@ -112,7 +112,7 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
     const lowerMessage = message.toLowerCase();
     
     // Buscar respuesta exacta o contextual
-    let reply = contextualResponses[lowerMessage];
+    let reply = contextualResponses[lowerMessage as keyof typeof contextualResponses];
     
     if (!reply) {
       // Generar respuesta basada en palabras clave
@@ -135,7 +135,7 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
     }
 
     // Generar información del lead basada en el mensaje y el contexto existente
-    const leadInfo = generateLeadInfo(phoneNumber, message, lowerMessage, conversation.leadInfo);
+    const leadInfo = generateLeadInfo(phoneNumber, message, lowerMessage, null);
 
     // Simular delay realista del bot
     await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 400));
@@ -218,7 +218,7 @@ function generateLeadInfo(phoneNumber: string, originalMessage: string, lowerMes
         if (pattern.source.includes('k')) {
           leadInfo.Budget = parseInt(amount) * 1000;
         } else if (pattern.source.includes('m')) {
-          leadInfo.Budget = parseInt(parseFloat(amount) * 1000000);
+          leadInfo.Budget = parseInt((parseFloat(amount) * 1000000).toString());
         } else {
           leadInfo.Budget = parseInt(amount);
         }

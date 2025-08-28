@@ -90,7 +90,7 @@ export function SuggestedProperties({ lead }: SuggestedPropertiesProps) {
             </div>
             
             <div className="text-xs text-gray-500">
-              Sugerida basada en: barrio preferido ({lead.Neighborhood}), {lead.Rooms} ambientes, presupuesto ${formatCurrency(lead.Budget)}
+              Sugerida basada en: barrio preferido ({lead.Neighborhood}), {lead.Rooms} ambientes, presupuesto ${lead.Budget ? formatCurrency(lead.Budget) : 'No especificado'}
             </div>
           </div>
         ))}
