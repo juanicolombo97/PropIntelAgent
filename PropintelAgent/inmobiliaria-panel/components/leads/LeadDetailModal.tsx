@@ -21,6 +21,7 @@ import {
   Plus
 } from 'lucide-react';
 import { Lead } from '@/lib/types';
+import { ChatSection } from '@/components/leads/ChatSection';
 
 interface LeadDetailModalProps {
   isOpen: boolean;
@@ -41,8 +42,9 @@ interface SuggestedProperty {
 }
 
 export function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'suggested' | 'activity'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'suggested' | 'activity' | 'chat'>('overview');
   const [suggestedProperties, setSuggestedProperties] = useState<SuggestedProperty[]>([]);
+  const [messages, setMessages] = useState<{ items: any[] }>({ items: [] });
   const [loading, setLoading] = useState(false);
 
   // Cargar datos reales cuando se abre el modal
@@ -52,6 +54,10 @@ export function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailModalProps)
       
       const loadData = async () => {
         try {
+          // Cargar mensajes del lead
+          const messagesData = await Admin.messages(lead.LeadId);
+          setMessages(messagesData);
+          
           // Cargar propiedades sugeridas basadas en LastSuggestions del lead
           if (lead.LastSuggestions && lead.LastSuggestions.length > 0) {
             const propertiesPromises = lead.LastSuggestions.map(async (propertyId) => {
@@ -182,11 +188,12 @@ export function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailModalProps)
             {[
               { id: 'overview', label: 'Vista General', icon: Eye },
               { id: 'suggested', label: 'Propiedades Sugeridas', icon: Home },
-              { id: 'activity', label: 'Actividad', icon: TrendingUp }
+              { id: 'activity', label: 'Actividad', icon: TrendingUp },
+              { id: 'chat', label: 'Historial de Conversaciones', icon: MessageSquare }
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'overview' | 'suggested' | 'activity')}
+                onClick={() => setActiveTab(tab.id as 'overview' | 'suggested' | 'activity' | 'chat')}
                 className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
@@ -413,6 +420,14 @@ export function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailModalProps)
                       </div>
                     </div>
                   </Card>
+                </div>
+              )}
+
+              {/* Chat Tab */}
+              {activeTab === 'chat' && (
+                <div className="space-y-6">
+                  <h3 className="text-lg font-semibold text-slate-900">Historial de Conversaciones</h3>
+                  <ChatSection leadId={lead.LeadId} messages={messages.items || []} />
                 </div>
               )}
             </>

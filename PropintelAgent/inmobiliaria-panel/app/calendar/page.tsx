@@ -1,430 +1,346 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Admin } from '@/lib/api';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Admin } from '@/lib/api';
-import { Visit } from '@/lib/types';
-import { Calendar, MapPin, User, Plus, Filter, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
-
-interface VisitWithDetails extends Visit {
-  leadName?: string;
-  leadPhone?: string;
-  propertyTitle?: string;
-  propertyAddress?: string;
-}
-
-interface CalendarDay {
-  date: Date;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  visits: VisitWithDetails[];
-}
+import { Badge } from '@/components/ui/Badge';
+import { Calendar, Plus, ChevronLeft, ChevronRight, Clock, MapPin, User, Home } from 'lucide-react';
+import { Visit, Lead, Property } from '@/lib/types';
+import { CreateVisitModal } from '@/components/calendar/CreateVisitModal';
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [allVisits, setAllVisits] = useState<VisitWithDetails[]>([]);
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'month' | 'day'>('month');
-  
-  // Navegar entre meses
-  const navigateMonth = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    if (direction === 'prev') {
-      newDate.setMonth(newDate.getMonth() - 1);
-    } else {
-      newDate.setMonth(newDate.getMonth() + 1);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [visitsData, leadsData, propertiesData] = await Promise.all([
+        Admin.getAllVisits(),
+        Admin.getAllLeads(),
+        Admin.getAllProperties(),
+      ]);
+      
+      setVisits(visitsData.items || []);
+      setLeads(leadsData.items || []);
+      setProperties(propertiesData.items || []);
+    } catch (error) {
+      console.error('Error loading calendar data:', error);
+    } finally {
+      setLoading(false);
     }
-    setCurrentDate(newDate);
   };
 
-  // Navegar entre días
-  const navigateDay = (direction: 'prev' | 'next') => {
-    const newDate = new Date(selectedDate);
-    if (direction === 'prev') {
-      newDate.setDate(newDate.getDate() - 1);
-    } else {
-      newDate.setDate(newDate.getDate() + 1);
-    }
-    setSelectedDate(newDate);
+  const handleVisitCreated = () => {
+    loadData();
   };
 
-  // Generar calendario mensual
-  const generateCalendarDays = (date: Date): CalendarDay[] => {
+  // Funciones para navegación del calendario
+  const goToPreviousMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  // Generar días del mes
+  const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
-    
-    // Primer día del mes
     const firstDay = new Date(year, month, 1);
-    // Último día del mes
     const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
     
-    // Día de la semana del primer día (0 = domingo, 1 = lunes, etc.)
-    const firstDayOfWeek = firstDay.getDay();
-    // Ajustar para que lunes sea 0
-    const adjustedFirstDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
-    
-    const days: CalendarDay[] = [];
-    
-    // Agregar días del mes anterior
-    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
-      const day = new Date(year, month, -i);
+    // Agregar días del mes anterior para completar la primera semana
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
       days.push({
-        date: day,
+        date: new Date(year, month - 1, prevMonthLastDay - startingDayOfWeek + i + 1),
         isCurrentMonth: false,
-        isToday: isSameDay(day, new Date()),
-        visits: getVisitsForDate(day)
+        isToday: false
       });
     }
-    
+
     // Agregar días del mes actual
-    for (let i = 1; i <= lastDay.getDate(); i++) {
-      const day = new Date(year, month, i);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month, day);
       days.push({
-        date: day,
+        date: currentDate,
         isCurrentMonth: true,
-        isToday: isSameDay(day, new Date()),
-        visits: getVisitsForDate(day)
+        isToday: currentDate.toDateString() === new Date().toDateString()
       });
     }
-    
-    // Completar la semana
+
+    // Agregar días del mes siguiente para completar la última semana
     const remainingDays = 42 - days.length; // 6 semanas * 7 días
-    for (let i = 1; i <= remainingDays; i++) {
-      const day = new Date(year, month + 1, i);
+    for (let day = 1; day <= remainingDays; day++) {
       days.push({
-        date: day,
+        date: new Date(year, month + 1, day),
         isCurrentMonth: false,
-        isToday: isSameDay(day, new Date()),
-        visits: getVisitsForDate(day)
+        isToday: false
       });
     }
-    
+
     return days;
   };
 
-  // Verificar si dos fechas son el mismo día
-  const isSameDay = (date1: Date, date2: Date): boolean => {
-    return date1.getFullYear() === date2.getFullYear() &&
-           date1.getMonth() === date2.getMonth() &&
-           date1.getDate() === date2.getDate();
-  };
-
   // Obtener visitas para una fecha específica
-  const getVisitsForDate = (date: Date): VisitWithDetails[] => {
+  const getVisitsForDate = (date: Date) => {
     const dateString = date.toISOString().split('T')[0];
-    return allVisits.filter(visit => visit.VisitAt.startsWith(dateString));
+    return visits.filter(visit => {
+      const visitDate = new Date(visit.VisitAt).toISOString().split('T')[0];
+      return visitDate === dateString;
+    });
   };
 
-  // Obtener visitas para la fecha seleccionada
-  const selectedDateVisits = getVisitsForDate(selectedDate);
+  // Obtener información del lead
+  const getLeadInfo = (leadId: string) => {
+    return leads.find(lead => lead.LeadId === leadId);
+  };
 
-  // Cargar datos
-  useEffect(() => {
-    const loadVisits = async () => {
-      try {
-        setLoading(true);
-        
-        // Cargar todas las visitas
-        const [newLeads, qualifiedLeads, properties] = await Promise.all([
-          Admin.leadsByStatus('NEW'),
-          Admin.leadsByStatus('QUALIFIED'),
-          Admin.properties()
-        ]);
+  // Obtener información de la propiedad
+  const getPropertyInfo = (propertyId: string) => {
+    return properties.find(property => property.PropertyId === propertyId);
+  };
 
-        const allLeads = [...(newLeads.items || []), ...(qualifiedLeads.items || [])];
-        const allProperties = properties.items || [];
-        
-        // Cargar visitas para cada lead
-        const visitsPromises = allLeads.map(async (lead) => {
-          try {
-            const visitsResponse = await Admin.visitsByLead(lead.LeadId);
-            return visitsResponse.items?.map(visit => {
-              const property = allProperties.find(p => p.PropertyId === visit.PropertyId);
-              return {
-                ...visit,
-                leadName: lead.LeadId.replace('whatsapp:', '').replace('+', ''),
-                leadPhone: lead.LeadId,
-                propertyTitle: property?.Title || `Propiedad ${visit.PropertyId}`,
-                propertyAddress: property ? `${property.Rooms} amb - ${property.Neighborhood}` : 'Dirección no disponible'
-              };
-            }) || [];
-          } catch (error) {
-            console.error(`Error loading visits for lead ${lead.LeadId}:`, error);
-            return [];
-          }
-        });
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
-        const allVisits = (await Promise.all(visitsPromises)).flat();
-        setAllVisits(allVisits);
-        
-      } catch (error) {
-        console.error('Error loading calendar data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('es-AR', {
+      year: 'numeric',
+      month: 'long'
+    });
+  };
 
-    loadVisits();
-  }, []);
+  const days = getDaysInMonth(currentDate);
 
-  const calendarDays = generateCalendarDays(currentDate);
-  const monthName = currentDate.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
-  const selectedDateFormatted = selectedDate.toLocaleDateString('es-AR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-
-  // Estadísticas
-  const stats = [
-    { label: 'Visitas este mes', value: allVisits.length.toString(), color: 'text-blue-600' },
-    { label: 'Confirmadas', value: allVisits.filter(v => v.Confirmed).length.toString(), color: 'text-green-600' },
-    { label: 'Pendientes', value: allVisits.filter(v => !v.Confirmed).length.toString(), color: 'text-yellow-600' },
-    { label: 'Hoy', value: getVisitsForDate(new Date()).length.toString(), color: 'text-purple-600' }
-  ];
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Cargando calendario...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="p-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl shadow-md">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-md">
             <Calendar size={28} className="text-white" />
           </div>
           <div>
             <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Calendario de Visitas</h1>
-            <p className="text-lg text-slate-600">Gestiona y programa tus visitas de manera eficiente</p>
+            <p className="text-lg text-slate-600">Gestiona y programa visitas a propiedades</p>
           </div>
         </div>
+        <Button 
+          variant="primary"
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-2"
+        >
+          <Plus size={18} />
+          Nueva Visita
+        </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {stats.map((stat, index) => (
-          <Card key={index} className="p-2 text-center">
-            <p className="text-xs font-medium text-slate-600">{stat.label}</p>
-            <p className={`text-sm font-bold ${stat.color}`}>{stat.value}</p>
-          </Card>
-        ))}
-      </div>
-
-      {/* View Mode Toggle */}
-      <div className="flex justify-center">
-        <div className="flex bg-slate-100 rounded-lg p-1">
-          <Button
-            variant={viewMode === 'month' ? 'primary' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('month')}
-          >
-            Mes
-          </Button>
-          <Button
-            variant={viewMode === 'day' ? 'primary' : 'ghost'}
-            size="sm"
-            onClick={() => setViewMode('day')}
-          >
-            Día
+      {/* Calendar Navigation */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={goToPreviousMonth}>
+              <ChevronLeft size={20} />
+            </Button>
+            <h2 className="text-2xl font-bold text-slate-900">{formatDate(currentDate)}</h2>
+            <Button variant="ghost" onClick={goToNextMonth}>
+              <ChevronRight size={20} />
+            </Button>
+          </div>
+          <Button variant="secondary" onClick={goToToday}>
+            Hoy
           </Button>
         </div>
-      </div>
 
-      {viewMode === 'month' ? (
-        /* Vista Mensual */
-        <Card className="p-4">
-          {/* Navegación del mes */}
-          <div className="flex items-center justify-between mb-4">
-            <Button variant="ghost" size="sm" onClick={() => navigateMonth('prev')}>
-              <ChevronLeft size={16} />
-            </Button>
-            <h2 className="text-lg font-bold text-slate-900 capitalize">{monthName}</h2>
-            <Button variant="ghost" size="sm" onClick={() => navigateMonth('next')}>
-              <ChevronRight size={16} />
-            </Button>
-          </div>
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {/* Day Headers */}
+          {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
+            <div key={day} className="p-3 text-center font-semibold text-slate-600 text-sm">
+              {day}
+            </div>
+          ))}
 
-          {/* Días de la semana */}
-          <div className="grid grid-cols-7 gap-1 mb-2">
-            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => (
-              <div key={day} className="p-2 text-center">
-                <span className="text-xs font-medium text-slate-600">{day}</span>
-              </div>
-            ))}
-          </div>
+          {/* Calendar Days */}
+          {days.map((day, index) => {
+            const dayVisits = getVisitsForDate(day.date);
+            const isSelected = selectedDate && day.date.toDateString() === selectedDate.toDateString();
 
-          {/* Calendario */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, index) => (
-              <button
+            return (
+              <div
                 key={index}
-                onClick={() => {
-                  setSelectedDate(day.date);
-                  setViewMode('day');
-                }}
-                className={`p-2 text-left rounded-lg border transition-all hover:shadow-md ${
-                  day.isToday
-                    ? 'bg-blue-100 border-blue-300 ring-2 ring-blue-200'
-                    : day.isCurrentMonth
-                    ? 'bg-white border-slate-200 hover:border-slate-300'
-                    : 'bg-slate-50 border-slate-100 text-slate-400'
+                className={`min-h-[120px] p-2 border border-slate-200 cursor-pointer transition-colors ${
+                  day.isCurrentMonth 
+                    ? 'bg-white hover:bg-slate-50' 
+                    : 'bg-slate-50 text-slate-400'
                 } ${
-                  day.visits.length > 0
-                    ? 'ring-2 ring-purple-200 border-purple-300'
+                  day.isToday 
+                    ? 'ring-2 ring-blue-500' 
+                    : ''
+                } ${
+                  isSelected 
+                    ? 'bg-blue-50 border-blue-300' 
                     : ''
                 }`}
+                onClick={() => {
+                  if (day.isCurrentMonth) {
+                    setSelectedDate(day.date);
+                    setIsCreateModalOpen(true);
+                  }
+                }}
               >
-                <div className="text-xs font-medium mb-1">
+                <div className="text-sm font-medium mb-1">
                   {day.date.getDate()}
                 </div>
-                {day.visits.length > 0 && (
-                  <div className="space-y-1">
-                    {day.visits.slice(0, 2).map((visit, visitIndex) => (
+                
+                {/* Visits for this day */}
+                <div className="space-y-1">
+                  {dayVisits.slice(0, 2).map((visit) => {
+                    const lead = getLeadInfo(visit.LeadId);
+                    const property = getPropertyInfo(visit.PropertyId);
+                    
+                    return (
                       <div
-                        key={visitIndex}
-                        className={`text-xs p-1 rounded ${
-                          visit.Confirmed
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                        key={visit.VisitAt}
+                        className={`p-1 rounded text-xs ${
+                          visit.Confirmed 
+                            ? 'bg-green-100 text-green-800 border border-green-200' 
+                            : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
                         }`}
                       >
-                        {new Date(visit.VisitAt).toLocaleTimeString('es-AR', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    ))}
-                    {day.visits.length > 2 && (
-                      <div className="text-xs text-slate-500">
-                        +{day.visits.length - 2} más
-                      </div>
-                    )}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </Card>
-      ) : (
-        /* Vista Diaria */
-        <Card className="p-4">
-          {/* Navegación del día */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigateDay('prev')}>
-                <ChevronLeft size={16} />
-              </Button>
-              <h2 className="text-lg font-bold text-slate-900 capitalize">{selectedDateFormatted}</h2>
-              <Button variant="ghost" size="sm" onClick={() => navigateDay('next')}>
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setViewMode('month')}>
-                <Calendar size={14} className="mr-1" />
-                Mes
-              </Button>
-              <Button variant="primary" size="sm">
-                <Plus size={14} className="mr-1" />
-                Nueva Visita
-              </Button>
-            </div>
-          </div>
-
-          {/* Visitas del día */}
-          <div className="space-y-3">
-            {loading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <p className="text-sm text-slate-600">Cargando visitas...</p>
-              </div>
-            ) : selectedDateVisits.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                <Clock size={48} className="mx-auto mb-4 text-slate-300" />
-                <p className="text-lg font-medium mb-2">No hay visitas programadas</p>
-                <p className="text-sm">Este día está libre para programar nuevas visitas</p>
-                <Button variant="primary" size="sm" className="mt-4">
-                  <Plus size={14} className="mr-1" />
-                  Programar Visita
-                </Button>
-              </div>
-            ) : (
-              selectedDateVisits
-                .sort((a, b) => new Date(a.VisitAt).getTime() - new Date(b.VisitAt).getTime())
-                .map((visit) => (
-                  <div key={`${visit.LeadId}-${visit.VisitAt}`} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                    <div className="flex-shrink-0 text-center">
-                      <div className="text-sm font-bold text-slate-900">
-                        {new Date(visit.VisitAt).toLocaleTimeString('es-AR', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                      <div className="text-xs text-slate-500">60 min</div>
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-1">
-                            <User size={12} />
-                            {visit.leadName || visit.LeadId}
-                          </h3>
-                          <p className="text-xs text-slate-500">{visit.leadPhone || visit.LeadId}</p>
-                        </div>
-                        <div className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          visit.Confirmed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {visit.Confirmed ? 'Confirmada' : 'Pendiente'}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-xs text-slate-600 mb-1">
                         <div className="flex items-center gap-1">
-                          <MapPin size={10} />
-                          <span>{visit.propertyAddress || 'Dirección no disponible'}</span>
+                          <Clock size={10} />
+                          {formatTime(visit.VisitAt)}
                         </div>
-                        <span className="text-slate-400">•</span>
-                        <span className="font-mono text-xs">{visit.PropertyId}</span>
+                        <div className="truncate">
+                          {lead?.LeadId || 'Lead N/A'}
+                        </div>
+                        <div className="truncate text-xs opacity-75">
+                          {property?.Title || 'Propiedad N/A'}
+                        </div>
                       </div>
-                      
-                      <p className="text-xs text-slate-500 italic">
-                        {visit.propertyTitle || `Propiedad ${visit.PropertyId}`}
-                      </p>
+                    );
+                  })}
+                  
+                  {dayVisits.length > 2 && (
+                    <div className="text-xs text-slate-500 text-center">
+                      +{dayVisits.length - 2} más
                     </div>
-                    
-                    <div className="flex-shrink-0 flex gap-1">
-                      <Button variant="ghost" size="sm">
-                        Editar
-                      </Button>
-                      <Button variant="secondary" size="sm">
-                        Contactar
-                      </Button>
-                    </div>
-                  </div>
-                ))
-            )}
-          </div>
-
-          {/* Horarios disponibles */}
-          {selectedDateVisits.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-slate-200">
-              <h3 className="text-sm font-medium text-slate-700 mb-3">Horarios disponibles</h3>
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                {['09:00', '10:30', '12:00', '14:00', '16:00', '17:30'].map((time) => (
-                  <button
-                    key={time}
-                    className="p-2 text-sm border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                  >
-                    {time}
-                  </button>
-                ))}
+                  )}
+                </div>
               </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Total Visitas</p>
+              <p className="text-2xl font-bold text-slate-900">{visits.length}</p>
             </div>
-          )}
+            <Calendar size={24} className="text-blue-500" />
+          </div>
         </Card>
-      )}
+        
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Confirmadas</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {visits.filter(v => v.Confirmed).length}
+              </p>
+            </div>
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Clock size={20} className="text-green-600" />
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Pendientes</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {visits.filter(v => !v.Confirmed).length}
+              </p>
+            </div>
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <Clock size={20} className="text-yellow-600" />
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-600">Este Mes</p>
+              <p className="text-2xl font-bold text-slate-900">
+                {visits.filter(v => {
+                  const visitDate = new Date(v.VisitAt);
+                  return visitDate.getMonth() === currentDate.getMonth() && 
+                         visitDate.getFullYear() === currentDate.getFullYear();
+                }).length}
+              </p>
+            </div>
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Calendar size={20} className="text-purple-600" />
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Create Visit Modal */}
+      <CreateVisitModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setSelectedDate(null);
+        }}
+        onVisitCreated={handleVisitCreated}
+        selectedDate={selectedDate}
+        leads={leads}
+        properties={properties}
+      />
     </div>
   );
 }

@@ -50,13 +50,15 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
                   className="cursor-pointer hover:bg-slate-50"
                 >
                 <TableCell>
-                  <Link 
-                    href={`/leads/${encodeURIComponent(lead.LeadId)}`}
-                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                    onClick={(e) => e.stopPropagation()}
+                  <span 
+                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLeadClick?.(lead);
+                    }}
                   >
                     {lead.LeadId}
-                  </Link>
+                  </span>
                 </TableCell>
                 <TableCell>{getStatusBadge(lead.Status)}</TableCell>
                 <TableCell>{lead.Intent || '-'}</TableCell>

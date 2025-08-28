@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Admin } from '@/lib/api';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { CreateLeadModal } from '@/components/leads/CreateLeadModal';
-import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Users, TrendingUp, Filter, Search, Plus } from 'lucide-react';
@@ -15,8 +15,7 @@ export default function LeadsPage() {
   const [qualifiedLeads, setQualifiedLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+
 
   useEffect(() => {
     loadLeads();
@@ -43,8 +42,8 @@ export default function LeadsPage() {
   };
 
   const handleLeadClick = (lead: Lead) => {
-    setSelectedLead(lead);
-    setIsDetailModalOpen(true);
+    // Navegar a la página de detalle del lead
+    window.location.href = `/leads/${encodeURIComponent(lead.LeadId)}`;
   };
 
   return (
@@ -158,11 +157,7 @@ export default function LeadsPage() {
         onLeadCreated={handleLeadCreated}
       />
       
-      <LeadDetailModal
-        isOpen={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        lead={selectedLead}
-      />
+
 
       {/* Empty State */}
       {(!loading && newLeads.length === 0 && qualifiedLeads.length === 0) && (

@@ -9,10 +9,29 @@ interface ChatSectionProps {
 }
 
 export function ChatSection({ leadId, messages }: ChatSectionProps) {
-  const sortedMessages = messages.sort((a, b) => parseInt(a.Timestamp) - parseInt(b.Timestamp));
+  console.log('🗨️ ChatSection - leadId:', leadId, 'messages:', messages);
+  
+  // Convertir el formato de mensajes si es necesario
+  const convertedMessages = (messages || []).map((msg: any, index: number) => {
+    // Si el mensaje tiene el formato nuevo (role/content)
+    if (msg.role && msg.content) {
+      return {
+        LeadId: leadId,
+        Timestamp: (Date.now() - (messages.length - index) * 1000).toString(), // Timestamps secuenciales
+        Direction: msg.role === 'user' ? 'in' : 'out',
+        Text: msg.content
+      };
+    }
+    // Si ya tiene el formato correcto
+    return msg;
+  });
+
+  const sortedMessages = convertedMessages.sort((a, b) => parseInt(a.Timestamp) - parseInt(b.Timestamp));
+  
+  console.log('🗨️ ChatSection - sortedMessages:', sortedMessages);
 
   return (
-    <Card title="Chat con el Lead">
+    <Card title="Historial de Conversaciones">
       <div className="space-y-4 max-h-96 overflow-y-auto">
         {sortedMessages.length > 0 ? (
           sortedMessages.map((message, index) => (

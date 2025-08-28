@@ -63,6 +63,9 @@ export const Admin = {
   leadsByStatus: (status: "NEW" | "QUALIFIED"): Promise<ApiResponse<Lead>> =>
     req(`/admin/leads?status=${status}`),
     
+  getAllLeads: (): Promise<ApiResponse<Lead>> =>
+    req(`/admin/leads`),
+    
   lead: (lead_id: string): Promise<Lead> =>
     req(`/admin/lead?lead_id=${encodeURIComponent(lead_id)}`),
     
@@ -93,6 +96,9 @@ export const Admin = {
   properties: (neighborhood?: string): Promise<ApiResponse<Property>> =>
     req(`/admin/properties${neighborhood ? `?neighborhood=${encodeURIComponent(neighborhood)}` : ""}`),
     
+  getAllProperties: (): Promise<ApiResponse<Property>> =>
+    req(`/admin/properties`),
+    
   createProperty: (item: CreatePropertyData): Promise<{ ok: boolean; id: string }> =>
     req(`/admin/properties`, {
       method: "POST",
@@ -113,6 +119,9 @@ export const Admin = {
     
   visitsByProperty: (property_id: string): Promise<ApiResponse<Visit>> =>
     req(`/admin/visits?property_id=${encodeURIComponent(property_id)}`),
+    
+  getAllVisits: (): Promise<ApiResponse<Visit>> =>
+    req(`/admin/visits`),
     
   createVisit: (visitData: {
     LeadId: string;

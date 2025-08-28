@@ -43,19 +43,8 @@ export function LeadActivity({ lead, messages, visits }: LeadActivityProps) {
       });
     }
     
-    // Actividad de mensajes
-    messages.forEach((message, index) => {
-      activities.push({
-        id: `message_${message.Timestamp}`,
-        type: message.Direction === 'in' ? 'message_received' : 'message_sent',
-        title: message.Direction === 'in' ? 'Mensaje recibido' : 'Mensaje enviado',
-        description: message.Text.length > 50 ? `${message.Text.substring(0, 50)}...` : message.Text,
-        timestamp: message.Timestamp,
-        icon: MessageSquare,
-        color: message.Direction === 'in' ? 'text-blue-600' : 'text-green-600',
-        bgColor: message.Direction === 'in' ? 'bg-blue-100' : 'bg-green-100'
-      });
-    });
+    // Nota: Los mensajes se muestran en la sección "Historial de Conversaciones"
+    // No se incluyen aquí para evitar duplicación
     
     // Actividad de visitas
     visits.forEach((visit) => {
@@ -90,8 +79,6 @@ export function LeadActivity({ lead, messages, visits }: LeadActivityProps) {
     const badges = {
       created: <Badge variant="info" size="sm">Creado</Badge>,
       updated: <Badge variant="success" size="sm">Actualizado</Badge>,
-      message_received: <Badge variant="info" size="sm">Recibido</Badge>,
-      message_sent: <Badge variant="success" size="sm">Enviado</Badge>,
       visit: <Badge variant="warning" size="sm">Visita</Badge>
     };
     return badges[type as keyof typeof badges] || <Badge variant="default" size="sm">Actividad</Badge>;
@@ -133,8 +120,8 @@ export function LeadActivity({ lead, messages, visits }: LeadActivityProps) {
           <div className="flex items-center justify-between text-xs text-gray-500">
             <span>Total de actividades: {activities.length}</span>
             <span>
-              {activities.filter(a => a.type === 'message_received').length} mensajes recibidos, 
-              {activities.filter(a => a.type === 'message_sent').length} enviados,
+              {activities.filter(a => a.type === 'created').length} creaciones, 
+              {activities.filter(a => a.type === 'updated').length} actualizaciones,
               {activities.filter(a => a.type === 'visit').length} visitas
             </span>
           </div>

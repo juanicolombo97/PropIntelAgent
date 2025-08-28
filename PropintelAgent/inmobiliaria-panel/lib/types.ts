@@ -35,6 +35,7 @@ export interface Visit {
   VisitAt: string;
   PropertyId: string;
   Confirmed: boolean;
+  Notes?: string;
   CreatedAt?: string;
 }
 
