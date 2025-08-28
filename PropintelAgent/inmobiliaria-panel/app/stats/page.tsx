@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Card } from '../../components/ui/Card';
-import { Admin } from '../../lib/api';
-import { Lead, Property, Visit } from '../../lib/types';
+import { Card } from '@/components/ui/Card';
+import { Admin } from '@/lib/api';
+import { Lead, Property, Visit } from '@/lib/types';
 import { BarChart3, TrendingUp, Calendar, MapPin, Home, Users, Target, Clock } from 'lucide-react';
 
 export default function StatsPage() {

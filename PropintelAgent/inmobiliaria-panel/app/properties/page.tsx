@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../lib/hooks';
-import { fetchAllProperties } from '../../lib/slices/propertiesSlice';
-import { PropertiesTable } from '../../components/properties/PropertiesTable';
-import { CreatePropertyModal } from '../../components/properties/CreatePropertyModal';
-import { PropertyDetailModal } from '../../components/properties/PropertyDetailModal';
-import { Card } from '../../components/ui/Card';
-import { Button } from '../../components/ui/Button';
+import { useAppDispatch, useAppSelector } from '@/lib/hooks';
+import { fetchAllProperties } from '@/lib/slices/propertiesSlice';
+import { PropertiesTable } from '@/components/properties/PropertiesTable';
+import { CreatePropertyModal } from '@/components/properties/CreatePropertyModal';
+import { PropertyDetailModal } from '@/components/properties/PropertyDetailModal';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { Building2, Plus, DollarSign, Home, Filter } from 'lucide-react';
 
 export default function PropertiesPage() {
