@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/hooks';
 import { fetchAllLeads } from '@/lib/slices/leadsSlice';
 import { LeadsTable } from '@/components/leads/LeadsTable';
 import { CreateLeadModal } from '@/components/leads/CreateLeadModal';
+import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -14,13 +15,16 @@ export default function LeadsPage() {
   const dispatch = useAppDispatch();
   const { items: leads, loading } = useAppSelector(state => state.leads);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState<'all' | 'NEW' | 'QUALIFIED'>('all');
 
   // Los datos se cargan automáticamente al inicializar la aplicación
   // No necesitamos cargar datos aquí
 
   const handleLeadClick = (lead: any) => {
-    window.location.href = `/leads/${encodeURIComponent(lead.LeadId)}`;
+    setSelectedLead(lead);
+    setIsDetailModalOpen(true);
   };
 
   const handleLeadCreated = () => {
@@ -181,6 +185,13 @@ export default function LeadsPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onLeadCreated={handleLeadCreated}
+      />
+
+      {/* Lead Detail Modal */}
+      <LeadDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        lead={selectedLead}
       />
     </div>
   );

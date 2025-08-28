@@ -151,73 +151,74 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-md">
-            <Calendar size={28} className="text-white" />
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-md">
+            <Calendar size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Calendario de Visitas</h1>
-            <p className="text-lg text-slate-600">Gestiona y programa visitas a propiedades</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900">Calendario de Visitas</h1>
+            <p className="text-sm text-slate-600">Gestiona y programa visitas a propiedades</p>
           </div>
         </div>
         <Button 
           variant="primary"
           onClick={handleCreateVisit}
           className="flex items-center gap-2"
+          size="sm"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           Nueva Visita
         </Button>
       </div>
 
-      {/* Stats Cards - Movidos arriba */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
+      {/* Stats Cards - Más compactos */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Total Visitas</p>
-              <p className="text-xl font-bold text-slate-900">{visits.length}</p>
+              <p className="text-xs font-medium text-slate-600">Total Visitas</p>
+              <p className="text-lg font-bold text-slate-900">{visits.length}</p>
             </div>
-            <Calendar size={20} className="text-blue-500" />
+            <Calendar size={18} className="text-blue-500" />
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Confirmadas</p>
-              <p className="text-xl font-bold text-slate-900">
+              <p className="text-xs font-medium text-slate-600">Confirmadas</p>
+              <p className="text-lg font-bold text-slate-900">
                 {visits.filter(v => v.Confirmed).length}
               </p>
             </div>
-            <div className="p-2 bg-green-100 rounded-lg">
-              <Clock size={16} className="text-green-600" />
+            <div className="p-1.5 bg-green-100 rounded-lg">
+              <Clock size={14} className="text-green-600" />
             </div>
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Pendientes</p>
-              <p className="text-xl font-bold text-slate-900">
+              <p className="text-xs font-medium text-slate-600">Pendientes</p>
+              <p className="text-lg font-bold text-slate-900">
                 {visits.filter(v => !v.Confirmed).length}
               </p>
             </div>
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <Clock size={16} className="text-yellow-600" />
+            <div className="p-1.5 bg-yellow-100 rounded-lg">
+              <Clock size={14} className="text-yellow-600" />
             </div>
           </div>
         </Card>
         
-        <Card className="p-4">
+        <Card className="p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Este Mes</p>
-              <p className="text-xl font-bold text-slate-900">
+              <p className="text-xs font-medium text-slate-600">Este Mes</p>
+              <p className="text-lg font-bold text-slate-900">
                 {visits.filter(v => {
                   const visitDate = new Date(v.VisitAt);
                   return visitDate.getMonth() === currentDate.getMonth() && 
@@ -225,35 +226,35 @@ export default function CalendarPage() {
                 }).length}
               </p>
             </div>
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Calendar size={16} className="text-purple-600" />
+            <div className="p-1.5 bg-purple-100 rounded-lg">
+              <Calendar size={14} className="text-purple-600" />
             </div>
           </div>
         </Card>
       </div>
 
       {/* Calendar Navigation */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={handlePreviousMonth}>
-              <ChevronLeft size={20} />
+      <Card className="p-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={handlePreviousMonth} size="sm">
+              <ChevronLeft size={18} />
             </Button>
-            <h2 className="text-xl font-bold text-slate-900">{formatDate(currentDate)}</h2>
-            <Button variant="ghost" onClick={handleNextMonth}>
-              <ChevronRight size={20} />
+            <h2 className="text-lg font-bold text-slate-900">{formatDate(currentDate)}</h2>
+            <Button variant="ghost" onClick={handleNextMonth} size="sm">
+              <ChevronRight size={18} />
             </Button>
           </div>
-          <Button variant="secondary" onClick={handleToday}>
+          <Button variant="secondary" onClick={handleToday} size="sm">
             Hoy
           </Button>
         </div>
 
         {/* Calendar Grid - Más compacto */}
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7 gap-0.5">
           {/* Day Headers */}
           {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
-            <div key={day} className="p-2 text-center font-semibold text-slate-600 text-sm">
+            <div key={day} className="p-1 text-center font-semibold text-slate-600 text-xs">
               {day}
             </div>
           ))}
@@ -266,13 +267,13 @@ export default function CalendarPage() {
             return (
               <div
                 key={index}
-                className={`min-h-[80px] p-1 border border-slate-200 cursor-pointer transition-colors ${
+                className={`min-h-[60px] p-1 border border-slate-200 cursor-pointer transition-colors ${
                   day.isCurrentMonth 
                     ? 'bg-white hover:bg-slate-50' 
                     : 'bg-slate-50 text-slate-400'
                 } ${
                   day.isToday 
-                    ? 'ring-2 ring-blue-500' 
+                    ? 'ring-1 ring-blue-500' 
                     : ''
                 } ${
                   isSelected 
@@ -285,31 +286,30 @@ export default function CalendarPage() {
                   }
                 }}
               >
-                <div className="text-xs font-medium mb-1">
+                <div className="text-xs font-medium mb-0.5">
                   {day.date.getDate()}
                 </div>
                 
-                {/* Visits for this day - Más compacto */}
+                {/* Visits for this day - Ultra compacto */}
                 <div className="space-y-0.5">
                   {dayVisits.slice(0, 1).map((visit) => {
                     const lead = getLeadInfo(visit.LeadId);
-                    const property = getPropertyInfo(visit.PropertyId);
                     
                     return (
                       <div
                         key={visit.VisitAt}
-                        className={`p-1 rounded text-xs ${
+                        className={`px-1 py-0.5 rounded text-xs ${
                           visit.Confirmed 
-                            ? 'bg-green-100 text-green-800 border border-green-200' 
-                            : 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}
                       >
                         <div className="flex items-center gap-1">
-                          <Clock size={8} />
-                          {formatTime(visit.VisitAt)}
+                          <Clock size={6} />
+                          <span className="text-xs">{formatTime(visit.VisitAt)}</span>
                         </div>
                         <div className="truncate text-xs">
-                          {lead?.LeadId?.slice(0, 8) || 'Lead N/A'}
+                          {lead?.LeadId?.slice(0, 6) || 'N/A'}
                         </div>
                       </div>
                     );

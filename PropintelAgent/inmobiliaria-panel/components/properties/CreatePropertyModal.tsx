@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Admin } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -77,19 +77,39 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
     }
   };
 
+  // Manejar tecla Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevenir scroll del body cuando el modal está abierto
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 min-h-screen">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto my-8">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ height: '100vh' }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg">
-              <Plus size={20} className="text-white" />
+              <Plus size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Nueva Propiedad</h2>
+              <h2 className="text-lg font-bold text-slate-900">Nueva Propiedad</h2>
               <p className="text-sm text-slate-600">Agregar una nueva propiedad al catálogo</p>
             </div>
           </div>
@@ -97,19 +117,19 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <X size={20} className="text-slate-500" />
+            <X size={18} className="text-slate-500" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Información Básica */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Home size={18} className="text-blue-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <Home size={16} className="text-blue-600" />
               Información Básica
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Input
                 name="PropertyId"
                 label="ID de Propiedad *"
@@ -159,11 +179,11 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
 
           {/* Ubicación */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <MapPin size={18} className="text-green-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <MapPin size={16} className="text-green-600" />
               Ubicación
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Input
                 name="Neighborhood"
                 label="Barrio *"
@@ -187,22 +207,22 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
 
           {/* Detalles */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <FileText size={18} className="text-purple-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <FileText size={16} className="text-purple-600" />
               Detalles Adicionales
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Descripción
                 </label>
                 <textarea
                   name="Description"
-                  rows={3}
+                  rows={2}
                   placeholder="Descripción detallada de la propiedad..."
                   value={formData.Description}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
               </div>
               
@@ -212,11 +232,11 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
                 </label>
                 <textarea
                   name="Features"
-                  rows={2}
+                  rows={1}
                   placeholder="Ej: Balcón, Cocina integrada, Piso alto, Luminoso..."
                   value={formData.Features}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
               </div>
               
@@ -234,18 +254,18 @@ export function CreatePropertyModal({ isOpen, onClose, onPropertyCreated }: Crea
 
           {/* Fotos */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <Upload size={18} className="text-orange-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <Upload size={16} className="text-orange-600" />
               Fotos (Próximamente)
             </h3>
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center">
-              <Upload size={32} className="mx-auto text-slate-400 mb-2" />
-              <p className="text-slate-500">Funcionalidad de carga de fotos próximamente</p>
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+              <Upload size={24} className="mx-auto text-slate-400 mb-2" />
+              <p className="text-sm text-slate-500">Funcionalidad de carga de fotos próximamente</p>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <Button
               type="button"
               variant="secondary"

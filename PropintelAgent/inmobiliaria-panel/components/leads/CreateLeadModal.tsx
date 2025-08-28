@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Admin } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +16,7 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     LeadId: '',
+    FullName: '',
     Phone: '',
     Intent: '',
     Neighborhood: '',
@@ -40,6 +41,7 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
     try {
       const payload = {
         LeadId: formData.LeadId,
+        FullName: formData.FullName || undefined,
         Phone: formData.Phone,
         Intent: formData.Intent || 'Compra',
         Neighborhood: formData.Neighborhood || undefined,
@@ -57,6 +59,7 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
       // Reset form
       setFormData({
         LeadId: '',
+        FullName: '',
         Phone: '',
         Intent: '',
         Neighborhood: '',
@@ -76,19 +79,39 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
     }
   };
 
+  // Manejar tecla Escape
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevenir scroll del body cuando el modal está abierto
+      document.body.style.overflow = 'hidden';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 min-h-screen">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto my-8">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" style={{ height: '100vh' }}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
-              <Plus size={20} className="text-white" />
+              <Plus size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-900">Nuevo Lead</h2>
+              <h2 className="text-lg font-bold text-slate-900">Nuevo Lead</h2>
               <p className="text-sm text-slate-600">Agregar un nuevo prospecto al sistema</p>
             </div>
           </div>
@@ -96,19 +119,29 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <X size={20} className="text-slate-500" />
+            <X size={18} className="text-slate-500" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Información Básica */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <User size={18} className="text-blue-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <User size={16} className="text-blue-600" />
               Información Básica
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Input
+                name="FullName"
+                label="Nombre Completo *"
+                placeholder="Ej: Juan Pérez"
+                value={formData.FullName}
+                onChange={handleInputChange}
+                required
+                size="md"
+              />
+              
               <Input
                 name="LeadId"
                 label="ID del Lead *"
@@ -133,11 +166,11 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
 
           {/* Intención y Preferencias */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <MapPin size={18} className="text-green-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <MapPin size={16} className="text-green-600" />
               Preferencias de Búsqueda
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Intención *
@@ -194,11 +227,11 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
 
           {/* Estado y Notas */}
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <FileText size={18} className="text-purple-600" />
+            <h3 className="text-base font-semibold text-slate-900 mb-3 flex items-center gap-2">
+              <FileText size={16} className="text-purple-600" />
               Información Adicional
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
                   Etapa Inicial
@@ -222,18 +255,18 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
                 </label>
                 <textarea
                   name="Notes"
-                  rows={3}
-                  placeholder="Notas adicionales sobre el lead, preferencias específicas, comentarios..."
+                  rows={2}
+                  placeholder="Notas adicionales sobre el lead..."
                   value={formData.Notes}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-200">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <Button
               type="button"
               variant="secondary"

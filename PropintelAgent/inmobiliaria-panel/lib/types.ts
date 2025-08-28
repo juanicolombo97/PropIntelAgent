@@ -1,5 +1,7 @@
 export interface Lead {
   LeadId: string;
+  FullName?: string;
+  Phone?: string;
   Status: "NEW" | "QUALIFIED";
   Intent?: string;
   Rooms?: number;
@@ -9,6 +11,7 @@ export interface Lead {
   Stage?: string | null;
   PendingPropertyId?: string | null;
   LastSuggestions?: string[];
+  Notes?: string;
   CreatedAt?: string;
   UpdatedAt?: string;
 }

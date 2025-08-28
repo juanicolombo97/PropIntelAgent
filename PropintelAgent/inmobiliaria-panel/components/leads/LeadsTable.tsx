@@ -34,6 +34,7 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
           <TableHeader>
             <TableRow>
               <TableHeaderCell>Lead ID</TableHeaderCell>
+              <TableHeaderCell>Nombre</TableHeaderCell>
               <TableHeaderCell>Estado</TableHeaderCell>
               <TableHeaderCell>Intención</TableHeaderCell>
               <TableHeaderCell>Habitaciones</TableHeaderCell>
@@ -60,6 +61,7 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
                     {lead.LeadId}
                   </span>
                 </TableCell>
+                <TableCell>{lead.FullName || '-'}</TableCell>
                 <TableCell>{getStatusBadge(lead.Status)}</TableCell>
                 <TableCell>{lead.Intent || '-'}</TableCell>
                 <TableCell>{lead.Rooms || '-'}</TableCell>

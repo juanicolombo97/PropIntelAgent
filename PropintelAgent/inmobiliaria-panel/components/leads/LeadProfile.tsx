@@ -23,6 +23,8 @@ export function LeadProfile({ lead }: LeadProfileProps) {
   };
 
   const profileFields = [
+    { label: 'Nombre Completo', value: lead.FullName || '-' },
+    { label: 'Teléfono', value: lead.Phone || '-' },
     { label: 'Estado', value: getStatusBadge(lead.Status) },
     { label: 'Intención', value: lead.Intent || '-' },
     { label: 'Habitaciones', value: lead.Rooms || '-' },
@@ -34,7 +36,7 @@ export function LeadProfile({ lead }: LeadProfileProps) {
 
   return (
     <Card title="Perfil del Lead">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {profileFields.map((field) => (
           <div key={field.label} className="flex flex-col">
             <span className="text-sm font-medium text-gray-700 mb-1">{field.label}</span>
