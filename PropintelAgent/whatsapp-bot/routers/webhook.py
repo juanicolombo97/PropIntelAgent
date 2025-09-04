@@ -5,7 +5,7 @@ from services.dynamo import (
     put_message, get_lead, update_lead, t_props, query_messages, create_visit,
     get_conversation_history, get_property_by_context
 )
-from services.ai import extract_slots, parse_visit_datetime, format_datetime_for_user, generate_agent_response
+from services.ai import extract_slots, parse_visit_datetime, format_datetime_for_user, generate_agent_response, get_filtered_properties
 from services.matching import find_matches, format_props_sms, props_ids
 from models.schemas import (
     merge_profile, qualifies, next_question, dec_to_native,
@@ -103,6 +103,30 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
         # Intentar identificar si el mensaje menciona una propiedad específica (por título, barrio u otros identificadores)
         property_context = get_property_by_context(lead, message_text)
         
+        # *** Flujo 0: Esperando confirmación de propiedad ***
+        if lead.get("Stage") == "AWAITING_PROPERTY_CONFIRMATION" and lead.get("PendingPropertyId"):
+            # Cliente confirma o rechaza la propiedad
+            if any(word in message_text.lower() for word in ["si", "sí", "si!", "correcto", "exacto", "esa es", "perfecto"]):
+                # Confirmó la propiedad - continuar con precalificación
+                print(f"✅ Cliente confirmó la propiedad {lead.get('PendingPropertyId')}")
+                # No limpiar PendingPropertyId, pero cambiar Stage para continuar con precalificación
+                update_lead(lead_id, {"Stage": None})  # Volver a conversación normal pero con propiedad confirmada
+                reply_text = "Perfecto! Es para vos o para alguien más?"
+                put_message(lead_id, reply_text, direction="out")
+                return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+            elif any(word in message_text.lower() for word in ["no", "no es", "otra", "diferente"]):
+                # Rechazó la propiedad - volver a buscar
+                print(f"❌ Cliente rechazó la propiedad {lead.get('PendingPropertyId')}")
+                clear_stage(lead)
+                update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
+                reply_text = "Entiendo. Me podés dar más detalles de la propiedad que buscás? Título completo o link?"
+                put_message(lead_id, reply_text, direction="out")
+                return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+            # Si no es clara la respuesta, seguir esperando
+            reply_text = "Necesito que me confirmes: es esta la propiedad que te interesa? (Si/No)"
+            put_message(lead_id, reply_text, direction="out")
+            return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+        
         # *** Flujo 1: Coordinación de visita - esperando fecha/hora del cliente ***
         if lead.get("Stage") == "AWAITING_DATE" and lead.get("PendingPropertyId"):
             # Si el cliente responde negativamente en lugar de dar una fecha (ej: "no", "más adelante")
@@ -173,6 +197,46 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
         # Si no hay respuesta (API falló), no responder nada
         if response is None:
             return PlainTextResponse("", media_type="application/xml")
+        
+        # *** DETECCIÓN AUTOMÁTICA: Si el LLM pregunta por confirmación de propiedad ***
+        property_confirmation_keywords = ["es esta la propiedad", "te interesa", "es esta", "es la que buscas"]
+        
+        print(f"🔍 Verificando detección...")
+        print(f"   Respuesta: {response[:100] if response else 'None'}...")
+        
+        if response and any(keyword in response.lower() for keyword in property_confirmation_keywords):
+            print(f"✅ DETECTADO pregunta de confirmación de propiedad!")
+            
+            available_props = get_filtered_properties(lead)
+            if len(available_props) == 1 and lead.get("Stage") != "AWAITING_PROPERTY_CONFIRMATION":
+                property_id = available_props[0].get("PropertyId")
+                print(f"🔄 SETEANDO Stage=AWAITING_PROPERTY_CONFIRMATION, PropertyId={property_id}")
+                update_lead(lead_id, {"Stage": "AWAITING_PROPERTY_CONFIRMATION", "PendingPropertyId": property_id})
+                print(f"✅ Lead actualizado para esperar confirmación de propiedad")
+        
+        # Si el LLM pregunta por fecha/hora, setear Stage AWAITING_DATE
+        elif response and any(keyword in response.lower() for keyword in ["que día", "qué día", "horario", "fecha", "cuando", "cuándo", "visita", "coordinar", "agendar"]):
+            print(f"✅ DETECTADO palabras de agendamiento en respuesta!")
+            
+            available_props = get_filtered_properties(lead)
+            print(f"   Propiedades disponibles: {len(available_props)}")
+            
+            if len(available_props) == 1:
+                property_id = available_props[0].get("PropertyId")
+                print(f"   PropertyId encontrado: {property_id}")
+                print(f"   Stage actual: {lead.get('Stage')}")
+                
+                if property_id and lead.get("Stage") != "AWAITING_DATE":
+                    print(f"🔄 SETEANDO Stage=AWAITING_DATE, PropertyId={property_id}")
+                    set_stage_awaiting_date(lead, property_id)
+                    update_lead(lead_id, {"Stage": "AWAITING_DATE", "PendingPropertyId": property_id})
+                    print(f"✅ Lead actualizado para esperar fecha de visita")
+                else:
+                    print(f"⚠️ No se setea Stage: property_id={property_id}, current_stage={lead.get('Stage')}")
+            else:
+                print(f"⚠️ No se puede setear AWAITING_DATE: {len(available_props)} propiedades disponibles")
+        else:
+            print(f"❌ NO se detectaron palabras especiales")
         
         # Verificar si la respuesta tiene múltiples preguntas y separarlas
         if "?" in response and response.count("?") > 1:
@@ -279,6 +343,84 @@ def test_bot_message(phone_number: str, message: str, verbose: bool = True) -> s
         if verbose:
             print(f"🔍 Slots detectados: {slots}")
         
+        # *** Flujo 0: Esperando confirmación de propiedad ***
+        if lead.get("Stage") == "AWAITING_PROPERTY_CONFIRMATION" and lead.get("PendingPropertyId"):
+            if verbose:
+                print(f"🔄 Lead en AWAITING_PROPERTY_CONFIRMATION - procesando confirmación...")
+            
+            # Cliente confirma o rechaza la propiedad
+            if any(word in message_text.lower() for word in ["si", "sí", "si!", "correcto", "exacto", "esa es", "perfecto"]):
+                # Confirmó la propiedad - continuar con precalificación
+                if verbose:
+                    print(f"✅ Cliente confirmó la propiedad {lead.get('PendingPropertyId')}")
+                update_lead(lead_id, {"Stage": None})  # Volver a conversación normal pero con propiedad confirmada
+                reply_text = "Perfecto! Es para vos o para alguien más?"
+                put_message(lead_id, reply_text, direction="out")
+                return reply_text
+            elif any(word in message_text.lower() for word in ["no", "no es", "otra", "diferente"]):
+                # Rechazó la propiedad - volver a buscar
+                if verbose:
+                    print(f"❌ Cliente rechazó la propiedad {lead.get('PendingPropertyId')}")
+                clear_stage(lead)
+                update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
+                reply_text = "Entiendo. Me podés dar más detalles de la propiedad que buscás? Título completo o link?"
+                put_message(lead_id, reply_text, direction="out")
+                return reply_text
+            # Si no es clara la respuesta, seguir esperando
+            reply_text = "Necesito que me confirmes: es esta la propiedad que te interesa? (Si/No)"
+            put_message(lead_id, reply_text, direction="out")
+            return reply_text
+        
+        # *** Flujo 1: Coordinación de visita - esperando fecha/hora del cliente ***
+        if lead.get("Stage") == "AWAITING_DATE" and lead.get("PendingPropertyId"):
+            if verbose:
+                print(f"🔄 Lead en AWAITING_DATE - procesando fecha...")
+            
+            # Si el cliente responde negativamente en lugar de dar una fecha
+            if message_text.lower().startswith("no"):
+                clear_stage(lead)
+                update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
+                return "Entiendo. No te preocupes, podemos coordinar en otro momento. Cualquier otra consulta, estoy a tu disposición."
+            
+            # Intentar interpretar la fecha/hora proporcionada por el cliente
+            date_data = parse_visit_datetime(message_text)
+            visit_iso = date_data.get("iso")
+            
+            if visit_iso:
+                # Crear notas automáticas con información del lead
+                notes_parts = []
+                if lead.get("Neighborhood"):
+                    notes_parts.append(f"Barrio: {lead.get('Neighborhood')}")
+                if lead.get("Rooms"):
+                    notes_parts.append(f"Ambientes: {lead.get('Rooms')}")
+                if lead.get("Budget"):
+                    notes_parts.append(f"Presupuesto: ${lead.get('Budget'):,}")
+                if lead.get("Intent"):
+                    notes_parts.append(f"Intención: {lead.get('Intent')}")
+                
+                notes = f"Visita solicitada por WhatsApp Bot. " + " | ".join(notes_parts) if notes_parts else "Visita solicitada por WhatsApp Bot"
+                
+                # Crear registro de la visita en DynamoDB
+                create_visit(lead_id, lead["PendingPropertyId"], visit_iso, notes)
+                
+                # Limpiar el estado de espera en el lead
+                clear_stage(lead)
+                update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
+                
+                # Formatear la fecha para la respuesta al cliente
+                fecha_str = format_datetime_for_user(visit_iso)
+                reply_text = f"¡Listo! He registrado tu solicitud de visita para {fecha_str}. Te confirmaremos los detalles a la brevedad. ¡Gracias!"
+                
+                # Guardar respuesta del agente
+                put_message(lead_id, reply_text, direction="out")
+                return reply_text
+            else:
+                # No se entendió la fecha
+                reply_text = ("Disculpá, no pude entender la fecha u hora que mencionaste. "
+                              "Por favor indicame un día y horario para la visita (por ej.: viernes 15hs o mañana 10:00).")
+                put_message(lead_id, reply_text, direction="out")
+                return reply_text
+        
         # Obtener historial completo de conversación desde la base de datos
         conversation_history = get_conversation_history(lead_id, limit=20)
         
@@ -303,6 +445,61 @@ def test_bot_message(phone_number: str, message: str, verbose: bool = True) -> s
             if verbose:
                 print("❌ No se pudo generar respuesta (API no disponible)")
             return ""
+        
+        # *** DETECCIÓN AUTOMÁTICA: Si el LLM pregunta por fecha/hora, setear Stage AWAITING_DATE ***
+        visit_scheduling_keywords = ["que día", "qué día", "horario", "fecha", "cuando", "cuándo", "visita", "coordinar", "agendar"]
+        
+        if verbose:
+            print(f"🔍 Verificando detección de agendamiento...")
+            print(f"   Respuesta: {reply_text[:100] if reply_text else 'None'}...")
+        
+        # Detectar confirmación de propiedad
+        property_confirmation_keywords = ["es esta la propiedad", "te interesa", "es esta", "es la que buscas"]
+        
+        if reply_text and any(keyword in reply_text.lower() for keyword in property_confirmation_keywords):
+            if verbose:
+                print(f"✅ DETECTADO pregunta de confirmación de propiedad!")
+            
+            available_props = get_filtered_properties(lead)
+            if len(available_props) == 1 and lead.get("Stage") != "AWAITING_PROPERTY_CONFIRMATION":
+                property_id = available_props[0].get("PropertyId")
+                if verbose:
+                    print(f"🔄 SETEANDO Stage=AWAITING_PROPERTY_CONFIRMATION, PropertyId={property_id}")
+                update_lead(lead_id, {"Stage": "AWAITING_PROPERTY_CONFIRMATION", "PendingPropertyId": property_id})
+                if verbose:
+                    print(f"✅ Lead actualizado para esperar confirmación de propiedad")
+        
+        # Detectar agendamiento
+        elif reply_text and any(keyword in reply_text.lower() for keyword in visit_scheduling_keywords):
+            if verbose:
+                print(f"✅ DETECTADO palabras de agendamiento en respuesta!")
+            
+            available_props = get_filtered_properties(lead)
+            if verbose:
+                print(f"   Propiedades disponibles: {len(available_props)}")
+            
+            if len(available_props) == 1:
+                property_id = available_props[0].get("PropertyId")
+                if verbose:
+                    print(f"   PropertyId encontrado: {property_id}")
+                    print(f"   Stage actual: {lead.get('Stage')}")
+                
+                if property_id and lead.get("Stage") != "AWAITING_DATE":
+                    if verbose:
+                        print(f"🔄 SETEANDO Stage=AWAITING_DATE, PropertyId={property_id}")
+                    set_stage_awaiting_date(lead, property_id)
+                    update_lead(lead_id, {"Stage": "AWAITING_DATE", "PendingPropertyId": property_id})
+                    if verbose:
+                        print(f"✅ Lead actualizado para esperar fecha de visita")
+                else:
+                    if verbose:
+                        print(f"⚠️ No se setea Stage: property_id={property_id}, current_stage={lead.get('Stage')}")
+            else:
+                if verbose:
+                    print(f"⚠️ No se puede setear AWAITING_DATE: {len(available_props)} propiedades disponibles")
+        else:
+            if verbose:
+                print(f"❌ NO se detectaron palabras especiales")
         
         # Actualizar datos del lead si tenemos nueva información
         if any(slots.values()):

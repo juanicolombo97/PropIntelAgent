@@ -147,15 +147,33 @@ def get_property_by_context(lead_data: dict, message_text: str) -> Dict[str, Any
         return {}
 
 def create_visit(lead_id: str, property_id: str, visit_iso: str, notes: str = None):
-    item = {
-        "LeadId": lead_id,
-        "VisitAt": visit_iso,
-        "PropertyId": property_id,
-        "Confirmed": False,
-        "CreatedAt": now_iso(),
-    }
-    if notes:
-        item["Notes"] = notes
+    print(f"🔄 Intentando crear visita...")
+    print(f"   LeadId: {lead_id}")
+    print(f"   PropertyId: {property_id}")
+    print(f"   VisitAt: {visit_iso}")
+    print(f"   Notes: {notes}")
     
-    t_visits.put_item(Item=item)
-    print(f"✅ Visita creada: LeadId={lead_id}, PropertyId={property_id}, VisitAt={visit_iso}, Confirmed=False")
+    try:
+        item = {
+            "LeadId": lead_id,
+            "VisitAt": visit_iso,
+            "PropertyId": property_id,
+            "Confirmed": False,
+            "CreatedAt": now_iso(),
+        }
+        if notes:
+            item["Notes"] = notes
+        
+        print(f"📝 Item a guardar: {item}")
+        
+        # Guardar en DynamoDB
+        response = t_visits.put_item(Item=item)
+        print(f"✅ Respuesta DynamoDB: {response}")
+        print(f"✅ Visita creada exitosamente: LeadId={lead_id}, PropertyId={property_id}, VisitAt={visit_iso}, Confirmed=False")
+        return True
+        
+    except Exception as e:
+        print(f"❌ ERROR creando visita: {type(e).__name__}: {str(e)}")
+        import traceback
+        print(f"❌ STACK TRACE: {traceback.format_exc()}")
+        return False

@@ -83,7 +83,7 @@ CONDICIONES PARA SÍ AGENDAR
 - No depende de vender (o si depende, ya tiene la propiedad publicada en venta).
 - La visita la hace quien decide.
 - Responde que puede avanzar si le gusta.
-→ En este escenario, proponé directamente día y hora concretos (no preguntes abierto). Mantené el tono humano.
+→ En este escenario, usa EXACTAMENTE esta frase: "Perfecto! Que día y horario te conviene para la visita?" (esto activa el sistema de agendamiento automático)
 
 OTRAS REGLAS
 - Si el cliente pide sugerencias, pedí 1-2 criterios clave y ofrecé 2-3 opciones (resumen breve). Si no lo pide, no envíes listados.
@@ -519,15 +519,26 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         # 4) Capacidad económica
         financing_confirmed = False
         for msg in conversation_history[-10:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["ahorro", "crédito", "efectivo", "financio", "banco"]):
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["ahorro", "crédito", "efectivo", "financio", "banco", "tengo", "suficiente"]):
                 financing_confirmed = True
                 break
         if not lead_data.get("Budget") and not financing_confirmed:
             missing_data.append("capacidad económica")
         
+        # 5) Listo para cerrar - verificar si ya confirmó que puede avanzar
+        ready_to_close = False
+        for msg in conversation_history[-5:]:
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar"]):
+                ready_to_close = True
+                break
+        if not ready_to_close:
+            missing_data.append("confirmación de que puede avanzar")
+        
         missing_info = ""
         if missing_data:
             missing_info = f"\n📋 DATOS FALTANTES para agendar visita: {', '.join(missing_data)}"
+        else:
+            missing_info = f"\n✅ TODOS LOS DATOS COMPLETADOS! PREGUNTA POR FECHA: 'Perfecto! Que día y horario te conviene para la visita?'"
         
         # Construir información del lead actual
         lead_info = "\n📋 DATOS ACTUALES DEL LEAD:\n"
@@ -580,9 +591,58 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
                 # Ya hay propiedad confirmada - continuar con precalificación
                 property_info += "\n✅ PROPIEDAD YA CONFIRMADA. Continúa con precalificación usando los datos del lead."
                 property_info += "\nNO preguntes por la propiedad nuevamente. Enfócate en completar datos faltantes para la visita."
+                if not missing_data:
+                    property_info += "\n🚨 OBLIGATORIO: Todos los datos están completos. DEBES preguntar: 'Perfecto! Que día y horario te conviene para la visita?'"
             elif len(available_properties) == 1:
-                property_info += "\n✅ UNA SOLA PROPIEDAD encontrada. Continúa con precalificación."
-                property_info += f"\nRespuesta: '{greeting}Es para vos o para alguien más?'"
+                prop = available_properties[0]
+                property_info += f"\n✅ UNA SOLA PROPIEDAD encontrada: {prop.get('Title', 'Sin título')}"
+                
+                # Mostrar información completa de la propiedad y pedir confirmación
+                prop_details = f"\n🏠 INFORMACIÓN DE LA PROPIEDAD:\n"
+                prop_details += f"📍 {prop.get('Title', 'Sin título')}\n"
+                if prop.get('Neighborhood'):
+                    prop_details += f"📍 Ubicación: {prop.get('Neighborhood')}\n"
+                if prop.get('Rooms'):
+                    prop_details += f"🏠 Ambientes: {prop.get('Rooms')}\n"
+                if prop.get('Price'):
+                    try:
+                        price_val = float(prop.get('Price'))
+                        if price_val >= 1000000:
+                            price_str = f"${price_val/1000000:.1f}M"
+                        elif price_val >= 1000:
+                            price_str = f"${int(price_val/1000)}k"
+                        else:
+                            price_str = f"${int(price_val)}"
+                        prop_details += f"💰 Precio: {price_str}\n"
+                    except:
+                        pass
+                if prop.get('URL'):
+                    prop_details += f"🔗 Link: {prop.get('URL')}\n"
+                
+                property_info += prop_details
+                property_info += f"\n🚨 RESPUESTA OBLIGATORIA:"
+                property_info += f"\n'{greeting}Te muestro la propiedad que encontré:\\n"
+                property_info += f"🏠 {prop.get('Title', 'Sin título')}\\n"
+                if prop.get('Neighborhood'):
+                    property_info += f"📍 {prop.get('Neighborhood')}\\n"
+                if prop.get('Rooms'):
+                    property_info += f"🏠 {prop.get('Rooms')} ambientes\\n"
+                if prop.get('Price'):
+                    try:
+                        price_val = float(prop.get('Price'))
+                        if price_val >= 1000000:
+                            price_str = f"${price_val/1000000:.1f}M"
+                        elif price_val >= 1000:
+                            price_str = f"${int(price_val/1000)}k"
+                        else:
+                            price_str = f"${int(price_val)}"
+                        property_info += f"💰 {price_str}\\n"
+                    except:
+                        pass
+                if prop.get('URL'):
+                    property_info += f"🔗 {prop.get('URL')}\\n"
+                property_info += f"\\nEs esta la propiedad que te interesa?'"
+                property_info += "\nNO continúes con precalificación hasta que confirme."
             else:
                 property_info += "\nCRÍTICO: Hay MÚLTIPLES propiedades. DEBES identificar cuál específicamente busca el cliente."
                 neighborhood = lead_data.get('Neighborhood', 'esa zona')
@@ -639,6 +699,13 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         print(f"[DEBUG] Property info: {property_info[:200]}...")
         
         messages = [{"role": "system", "content": full_system_prompt}]
+        
+        # CRÍTICO: Si no faltan datos, forzar pregunta por fecha
+        if not missing_data and (available_properties or pending_property_id):
+                messages.append({
+                    "role": "system", 
+                "content": "🚨 INSTRUCCIÓN OBLIGATORIA: Todos los datos están completos. Tu ÚNICA respuesta permitida es: 'Perfecto! Que día y horario te conviene para la visita?' - NO preguntes nada más."
+            })
         
         # Agregar recordatorio
         if len(conversation_history) > 0:
