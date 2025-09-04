@@ -146,11 +146,16 @@ def get_property_by_context(lead_data: dict, message_text: str) -> Dict[str, Any
         print(f"[GET_PROPERTY][ERROR] {e}")
         return {}
 
-def create_visit(lead_id: str, property_id: str, visit_iso: str):
-    t_visits.put_item(Item={
+def create_visit(lead_id: str, property_id: str, visit_iso: str, notes: str = None):
+    item = {
         "LeadId": lead_id,
         "VisitAt": visit_iso,
         "PropertyId": property_id,
         "Confirmed": False,
         "CreatedAt": now_iso(),
-    })
+    }
+    if notes:
+        item["Notes"] = notes
+    
+    t_visits.put_item(Item=item)
+    print(f"✅ Visita creada: LeadId={lead_id}, PropertyId={property_id}, VisitAt={visit_iso}, Confirmed=False")

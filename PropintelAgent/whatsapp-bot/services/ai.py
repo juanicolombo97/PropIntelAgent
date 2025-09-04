@@ -44,7 +44,9 @@ OBJETIVO
 - NUNCA ofrezcas derivar a un humano por tu cuenta. Solo si el cliente pregunta específicamente si sos un bot o pide hablar con una persona.
 
 POLÍTICA DE CONVERSACIÓN
-- CRÍTICO: Siempre recibirás una lista de PROPIEDADES DISPONIBLES filtradas. USA esta lista para identificar exactamente de qué propiedad habla el cliente.
+- CRÍTICO: Recibirás DATOS ACTUALES DEL LEAD y una lista de PROPIEDADES DISPONIBLES. USA estos datos inteligentemente.
+- NUNCA preguntes datos que YA ESTÁN en los DATOS ACTUALES DEL LEAD.
+- Si ya hay "Propiedad confirmada" en los datos → NO busques más propiedades, continúa con precalificación.
 - Si la lista está VACÍA y el cliente mencionó un barrio → DEBES responder: "No tengo propiedades disponibles en [barrio]. Me podés dar más detalles? Título completo o link?"
 - Si encuentras UNA SOLA coincidencia exacta en la lista → seguí directo con precalificación: "Es para vos o para alguien más?" (NO digas "Hola" si ya conversaron)
 - Si hay MÚLTIPLES propiedades en la lista → identificar cuál específicamente: "Tengo varias propiedades en [barrio]. Cuál te interesa? Me podés dar el título o algún detalle específico?" (primer mensaje: agregar "Hola!")
@@ -53,7 +55,8 @@ POLÍTICA DE CONVERSACIÓN
 - NUNCA respondas "Hola, como estas?" si hay contexto de propiedad específica.
 - NUNCA continúes con precalificación si no encontraste una propiedad específica.
 - No ofrezcas visita si no hay propiedad concreta ni si faltan requisitos mínimos.
-- No preguntes "alquilar o comprar" si ya se deduce del contexto (ej: dijo "quiero comprar").
+- ADAPTATIVO: Si ya sabés la intención (venta/alquiler) del lead, NO preguntes "alquilar o comprar".
+- ADAPTATIVO: Si ya sabés el barrio, ambientes, presupuesto del lead, úsalos en la conversación.
 - Hacé preguntas adaptativas: solo lo que falta. Combiná cuando tenga sentido.
 - Si el cliente no coopera tras 2 intentos, cerrá cordialmente SIN mencionar derivar a humano.
 
@@ -445,11 +448,40 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         return None
     
     try:
-        # Obtener propiedades filtradas para pasarle a la IA
-        available_properties = get_filtered_properties(lead_data)
-        print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
-        if available_properties:
-            print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
+        # CRÍTICO: Si ya hay PendingPropertyId, usar ESA propiedad específica
+        pending_property_id = lead_data.get("PendingPropertyId")
+        if pending_property_id:
+            print(f"[DEBUG] Usando propiedad ya confirmada: {pending_property_id}")
+            # Obtener la propiedad específica confirmada
+            try:
+                from services.dynamo import t_props
+                from models.schemas import dec_to_native
+                
+                resp = t_props.get_item(Key={"PropertyId": pending_property_id})
+                item = resp.get("Item")
+                if item:
+                    prop = dec_to_native(item)
+                    available_properties = [{
+                        "PropertyId": prop.get("PropertyId"),
+                        "Title": prop.get("Title"),
+                        "Neighborhood": prop.get("Neighborhood"),
+                        "Rooms": prop.get("Rooms"),
+                        "Price": prop.get("Price"),
+                        "URL": prop.get("URL")
+                    }]
+                    print(f"[DEBUG] Propiedad confirmada cargada: {prop.get('Title', 'Sin título')}")
+                else:
+                    available_properties = []
+                    print(f"[DEBUG] ERROR: No se encontró la propiedad confirmada {pending_property_id}")
+            except Exception as e:
+                print(f"[DEBUG] ERROR obteniendo propiedad confirmada: {e}")
+                available_properties = []
+        else:
+            # Obtener propiedades filtradas para pasarle a la IA
+            available_properties = get_filtered_properties(lead_data)
+            print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
+            if available_properties:
+                print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
         
         # Contar cuántas veces se ha preguntado por más detalles
         property_detail_requests = 0
@@ -462,8 +494,8 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         # Construir información sobre datos faltantes para visita
         missing_data = []
         
-        # 1) Propiedad específica
-        if not available_properties or len(available_properties) != 1:
+        # 1) Propiedad específica - SOLO falta si no hay PendingPropertyId y no hay propiedades disponibles
+        if not pending_property_id and (not available_properties or len(available_properties) != 1):
             missing_data.append("propiedad específica identificada")
         
         # 2) Para quién es la compra
@@ -497,8 +529,21 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         if missing_data:
             missing_info = f"\n📋 DATOS FALTANTES para agendar visita: {', '.join(missing_data)}"
         
+        # Construir información del lead actual
+        lead_info = "\n📋 DATOS ACTUALES DEL LEAD:\n"
+        if lead_data.get("Neighborhood"):
+            lead_info += f"• Barrio: {lead_data.get('Neighborhood')}\n"
+        if lead_data.get("Rooms"):
+            lead_info += f"• Ambientes: {lead_data.get('Rooms')}\n"
+        if lead_data.get("Budget"):
+            lead_info += f"• Presupuesto: ${lead_data.get('Budget'):,}\n"
+        if lead_data.get("Intent"):
+            lead_info += f"• Intención: {lead_data.get('Intent')}\n"
+        if pending_property_id:
+            lead_info += f"• Propiedad confirmada: {pending_property_id}\n"
+        
         # Construir contexto de propiedades
-        property_info = missing_info
+        property_info = lead_info + missing_info
         
         if available_properties:
             property_info += f"\n🏠 PROPIEDADES DISPONIBLES ({len(available_properties)}):\n"
@@ -531,7 +576,11 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
             is_first_message = len(conversation_history) <= 1
             greeting = "Hola! " if is_first_message else ""
             
-            if len(available_properties) == 1:
+            if pending_property_id:
+                # Ya hay propiedad confirmada - continuar con precalificación
+                property_info += "\n✅ PROPIEDAD YA CONFIRMADA. Continúa con precalificación usando los datos del lead."
+                property_info += "\nNO preguntes por la propiedad nuevamente. Enfócate en completar datos faltantes para la visita."
+            elif len(available_properties) == 1:
                 property_info += "\n✅ UNA SOLA PROPIEDAD encontrada. Continúa con precalificación."
                 property_info += f"\nRespuesta: '{greeting}Es para vos o para alguien más?'"
             else:
@@ -640,6 +689,7 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
             print(f"❌ STACK TRACE: {traceback.format_exc()}")
             return None
             
+                
     except Exception as e:
         print(f"❌ ERROR: Excepción general en generate_agent_response")
         print(f"❌ TIPO: {type(e).__name__}")

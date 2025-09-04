@@ -117,8 +117,21 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
             date_data = parse_visit_datetime(message_text)
             visit_iso = date_data.get("iso")
             if visit_iso:
+                # Crear notas automáticas con información del lead
+                notes_parts = []
+                if lead.get("Neighborhood"):
+                    notes_parts.append(f"Barrio: {lead.get('Neighborhood')}")
+                if lead.get("Rooms"):
+                    notes_parts.append(f"Ambientes: {lead.get('Rooms')}")
+                if lead.get("Budget"):
+                    notes_parts.append(f"Presupuesto: ${lead.get('Budget'):,}")
+                if lead.get("Intent"):
+                    notes_parts.append(f"Intención: {lead.get('Intent')}")
+                
+                notes = f"Visita solicitada por WhatsApp Bot. " + " | ".join(notes_parts) if notes_parts else "Visita solicitada por WhatsApp Bot"
+                
                 # Crear registro de la visita en DynamoDB (estado pendiente de confirmación)
-                create_visit(lead_id, lead["PendingPropertyId"], visit_iso)
+                create_visit(lead_id, lead["PendingPropertyId"], visit_iso, notes)
                 # Limpiar el estado de espera en el lead
                 clear_stage(lead)
                 update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
