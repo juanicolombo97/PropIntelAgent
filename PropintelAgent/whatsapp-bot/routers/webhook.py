@@ -185,6 +185,41 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
             put_message(lead_id, reply_text, direction="out")
             return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
         
+        # *** Flujo 3: Verificar si todos los datos están completos para agendamiento automático ***
+        # Verificar si el lead ya tiene propiedad confirmada y todos los datos necesarios
+        if lead.get("PendingPropertyId") and lead.get("Stage") != "AWAITING_DATE":
+            # Verificar datos de precalificación en el historial
+            buyer_confirmed = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["para mi", "para mí", "es mío", "para mia", "mio", "mía"])
+                for msg in conversation_history[-10:]
+            )
+            motive_confirmed = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["mudanza", "mudarme", "inversión", "invertir", "inversion", "inversor"])
+                for msg in conversation_history[-10:]
+            )
+            financing_confirmed = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["ahorro", "crédito", "efectivo", "financio", "banco", "tengo", "suficiente"])
+                for msg in conversation_history[-10:]
+            ) or lead.get("Budget")
+            ready_to_close = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar", "quiero comprar", "quiero alquilar", "me interesa"])
+                for msg in conversation_history[-5:]
+            )
+            
+            print(f"[DEBUG] Verificando datos completos:")
+            print(f"   buyer_confirmed: {buyer_confirmed}")
+            print(f"   motive_confirmed: {motive_confirmed}")
+            print(f"   financing_confirmed: {financing_confirmed}")
+            print(f"   ready_to_close: {ready_to_close}")
+            
+            if buyer_confirmed and motive_confirmed and financing_confirmed and ready_to_close:
+                print(f"🚀 TODOS LOS DATOS COMPLETOS - FORZANDO AGENDAMIENTO")
+                set_stage_awaiting_date(lead, lead["PendingPropertyId"])
+                update_lead(lead_id, {"Stage": "AWAITING_DATE"})
+                reply_text = "Perfecto! Que día y horario te conviene para la visita?"
+                put_message(lead_id, reply_text, direction="out")
+                return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+        
         # (Sin flujo de ofertas/sugerencias automáticas: el LLM decide qué decir en base al prompt)
         
         # *** Flujo 4: Conversación general (aún faltan datos o uso de IA para responder) ***
@@ -214,15 +249,16 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
                 update_lead(lead_id, {"Stage": "AWAITING_PROPERTY_CONFIRMATION", "PendingPropertyId": property_id})
                 print(f"✅ Lead actualizado para esperar confirmación de propiedad")
         
-        # Si el LLM pregunta por fecha/hora, setear Stage AWAITING_DATE
-        elif response and any(keyword in response.lower() for keyword in ["que día", "qué día", "horario", "fecha", "cuando", "cuándo", "visita", "coordinar", "agendar"]):
-            print(f"✅ DETECTADO palabras de agendamiento en respuesta!")
+        # Si el LLM pregunta ESPECÍFICAMENTE por fecha/hora para agendar, setear Stage AWAITING_DATE
+        elif response and any(phrase in response.lower() for phrase in ["que día", "qué día", "que dia", "horario te conviene", "cuando te conviene"]):
+            # DETECCIÓN ESPECÍFICA: Frases que indican pregunta por fecha de agendamiento
+            print(f"✅ DETECTADO pregunta de fecha/horario!")
             
             available_props = get_filtered_properties(lead)
             print(f"   Propiedades disponibles: {len(available_props)}")
             
-            if len(available_props) == 1:
-                property_id = available_props[0].get("PropertyId")
+            if len(available_props) == 1 or lead.get("PendingPropertyId"):
+                property_id = lead.get("PendingPropertyId") or available_props[0].get("PropertyId")
                 print(f"   PropertyId encontrado: {property_id}")
                 print(f"   Stage actual: {lead.get('Stage')}")
                 
@@ -427,6 +463,42 @@ def test_bot_message(phone_number: str, message: str, verbose: bool = True) -> s
         if verbose:
             print(f"💬 Historial: {len(conversation_history)} mensajes")
         
+        # *** Verificar si todos los datos están completos para agendamiento automático ***
+        if lead.get("PendingPropertyId") and lead.get("Stage") != "AWAITING_DATE":
+            # Verificar datos de precalificación en el historial
+            buyer_confirmed = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["para mi", "para mí", "es mío", "para mia", "mio", "mía"])
+                for msg in conversation_history[-10:]
+            )
+            motive_confirmed = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["mudanza", "mudarme", "inversión", "invertir", "inversion", "inversor"])
+                for msg in conversation_history[-10:]
+            )
+            financing_confirmed = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["ahorro", "crédito", "efectivo", "financio", "banco", "tengo", "suficiente"])
+                for msg in conversation_history[-10:]
+            ) or lead.get("Budget")
+            ready_to_close = any(
+                msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar", "quiero comprar", "quiero alquilar", "me interesa"])
+                for msg in conversation_history[-5:]
+            )
+            
+            if verbose:
+                print(f"[DEBUG] Verificando datos completos:")
+                print(f"   buyer_confirmed: {buyer_confirmed}")
+                print(f"   motive_confirmed: {motive_confirmed}")
+                print(f"   financing_confirmed: {financing_confirmed}")
+                print(f"   ready_to_close: {ready_to_close}")
+            
+            if buyer_confirmed and motive_confirmed and financing_confirmed and ready_to_close:
+                if verbose:
+                    print(f"🚀 TODOS LOS DATOS COMPLETOS - FORZANDO AGENDAMIENTO")
+                set_stage_awaiting_date(lead, lead["PendingPropertyId"])
+                update_lead(lead_id, {"Stage": "AWAITING_DATE"})
+                reply_text = "Perfecto! Que día y horario te conviene para la visita?"
+                put_message(lead_id, reply_text, direction="out")
+                return reply_text
+        
         # Intentar identificar la propiedad específica por la que consulta
         property_context = get_property_by_context(lead, message_text)
         
@@ -469,17 +541,18 @@ def test_bot_message(phone_number: str, message: str, verbose: bool = True) -> s
                 if verbose:
                     print(f"✅ Lead actualizado para esperar confirmación de propiedad")
         
-        # Detectar agendamiento
-        elif reply_text and any(keyword in reply_text.lower() for keyword in visit_scheduling_keywords):
+        # Detectar agendamiento específico
+        elif reply_text and any(phrase in reply_text.lower() for phrase in ["que día", "qué día", "que dia", "horario te conviene", "cuando te conviene"]):
+            # DETECCIÓN ESPECÍFICA: Frases que indican pregunta por fecha de agendamiento
             if verbose:
-                print(f"✅ DETECTADO palabras de agendamiento en respuesta!")
+                print(f"✅ DETECTADO pregunta de fecha/horario!")
             
             available_props = get_filtered_properties(lead)
             if verbose:
                 print(f"   Propiedades disponibles: {len(available_props)}")
             
-            if len(available_props) == 1:
-                property_id = available_props[0].get("PropertyId")
+            if len(available_props) == 1 or lead.get("PendingPropertyId"):
+                property_id = lead.get("PendingPropertyId") or available_props[0].get("PropertyId")
                 if verbose:
                     print(f"   PropertyId encontrado: {property_id}")
                     print(f"   Stage actual: {lead.get('Stage')}")

@@ -59,6 +59,7 @@ POLÍTICA DE CONVERSACIÓN
 - ADAPTATIVO: Si ya sabés el barrio, ambientes, presupuesto del lead, úsalos en la conversación.
 - Hacé preguntas adaptativas: solo lo que falta. Combiná cuando tenga sentido.
 - Si el cliente no coopera tras 2 intentos, cerrá cordialmente SIN mencionar derivar a humano.
+- IMPORTANTE: Cuando el cliente pida agendar/coordinar una visita, siempre aclarále: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos."
 
 REQUISITOS MÍNIMOS PARA AGENDAR VISITA
 1) Referencia clara de la propiedad: link, dirección, código, o barrio + detalle. Si no hay propiedad concreta → no se agenda. Solo sugerí opciones si el cliente lo pide.
@@ -110,6 +111,12 @@ EJEMPLO CRÍTICO - CONTEXTO DE CONVERSACIÓN:
 
 Cliente: "Quiero coordinar visita"
 Gonzalo: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Te contactaste por que propiedad en particular?"
+
+Cliente: "Quiero organizar una visita"
+Gonzalo: "Perfecto. Puedo coordinar la visita, pero antes necesito confirmar algunos datos que pide el sistema. Lo vemos rápido y seguimos. Cuál te interesa?"
+
+Cliente: "Me interesa agendar" 
+Gonzalo: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Es para vos o para alguien más?"
 
 Cliente: "Es para mi, para mudarme"
 Gonzalo: "Perfecto. En que plazo pensas mudarte y hace cuanto estas buscando?"
@@ -501,7 +508,7 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         # 2) Para quién es la compra
         buyer_confirmed = False
         for msg in conversation_history[-10:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["para mi", "para mí", "es mío", "es para mi hijo", "puedo decidir"]):
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["para mi", "para mí", "es mío", "es para mi hijo", "puedo decidir", "para mia", "mio", "mía"]):
                 buyer_confirmed = True
                 break
         if not buyer_confirmed:
@@ -510,7 +517,7 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         # 3) Motivo de búsqueda
         motive_confirmed = False
         for msg in conversation_history[-10:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["mudanza", "mudarme", "inversión", "invertir"]):
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["mudanza", "mudarme", "inversión", "invertir", "inversion", "inversor"]):
                 motive_confirmed = True
                 break
         if not motive_confirmed:
@@ -528,7 +535,7 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         # 5) Listo para cerrar - verificar si ya confirmó que puede avanzar
         ready_to_close = False
         for msg in conversation_history[-5:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar"]):
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar", "quiero comprar", "quiero alquilar", "me interesa"]):
                 ready_to_close = True
                 break
         if not ready_to_close:
@@ -542,6 +549,8 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
         
         # Construir información del lead actual
         lead_info = "\n📋 DATOS ACTUALES DEL LEAD:\n"
+        if lead_data.get("LeadId"):
+            lead_info += f"• Número de teléfono: {lead_data.get('LeadId')} (YA LO TIENES - NO lo pidas)\n"
         if lead_data.get("Neighborhood"):
             lead_info += f"• Barrio: {lead_data.get('Neighborhood')}\n"
         if lead_data.get("Rooms"):
