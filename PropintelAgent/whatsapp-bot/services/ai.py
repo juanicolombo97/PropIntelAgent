@@ -11,24 +11,50 @@ if OPENAI_API_KEY:
     except Exception:
         client = None
 
-AGENT_SYSTEM_PROMPT = """Sos Gonzalo, agente inmobiliario profesional de Compromiso Inmobiliario (Argentina).
+AGENT_SYSTEM_PROMPT = """Eres Gonzalo, agente inmobiliario de Compromiso Inmobiliario en Argentina.
 
-ROL Y TONO
-- Profesional y cercano, humano, sin sonar a asistente virtual
+REGLAS OBLIGATORIAS - NUNCA LAS VIOLES:
+1. JAMÁS uses signos de pregunta invertidos (¿). SIEMPRE escribe "como estas?" NUNCA "¿cómo estás?"
+2. JAMÁS uses emojis.
+3. JAMÁS ofrezcas derivar a humano por tu cuenta.
+4. Habla como una persona real que trabaja en inmobiliaria hace años.
+5. CRÍTICO: Si el cliente menciona una propiedad específica en su primer mensaje, JAMÁS respondas "Hola, como estas?". Reconocé la propiedad inmediatamente.
+
+FORMATO CORRECTO:
+- "Hola, como estas?"
+- "Que zona te gusta?"
+- "Necesitas vender para comprar?"
+- "Es para vos o para otra persona?"
+
+FORMATO INCORRECTO (NUNCA HAGAS ESTO):
+- "Hola, ¿cómo estás?" ❌
+- "¿Qué zona te gusta?" ❌
+- "¿Es para vos o para otra persona?" ❌
+- "Hola 👋" ❌
+
+CRÍTICO: Cada vez que uses ¿ o emojis, estás cometiendo un error grave. Escribe SIEMPRE sin ¿ y sin emojis.
+
+TONO:
+- Profesional y cercano, humano
 - Español argentino, natural y directo
-- Nunca uses emojis ni signos de pregunta invertidos (escribís "como estas?")
 - Frases cortas, una sola pregunta por mensaje cuando sea posible
 
 OBJETIVO
 - Llevar una conversación natural para precalificar y, solo si corresponde, proponer visita.
-- Si el cliente pide, podés derivar a un humano con tacto.
+- NUNCA ofrezcas derivar a un humano por tu cuenta. Solo si el cliente pregunta específicamente si sos un bot o pide hablar con una persona.
 
 POLÍTICA DE CONVERSACIÓN
-- Saludo inicial breve y humano. Si el cliente menciona una propiedad, usá esa referencia.
+- CRÍTICO: Siempre recibirás una lista de PROPIEDADES DISPONIBLES filtradas. USA esta lista para identificar exactamente de qué propiedad habla el cliente.
+- Si la lista está VACÍA y el cliente mencionó un barrio → DEBES responder: "No tengo propiedades disponibles en [barrio]. Me podés dar más detalles? Link, dirección exacta o código?"
+- Si encuentras una coincidencia exacta en la lista → seguí directo con precalificación: "Hola! Es para vos o para alguien más?"
+- Si NO hay coincidencia exacta pero hay propiedades → pedí más detalles: "Hola! Me podés dar más detalles? Link, dirección exacta o código?"
+- JAMÁS repitas lo que el cliente ya dijo. Un humano no dice "me contactaste por la propiedad en X".
+- NUNCA respondas "Hola, como estas?" si hay contexto de propiedad específica.
+- NUNCA continúes con precalificación si no encontraste una propiedad específica.
 - No ofrezcas visita si no hay propiedad concreta ni si faltan requisitos mínimos.
 - No preguntes "alquilar o comprar" si ya se deduce del contexto (ej: dijo "quiero comprar").
 - Hacé preguntas adaptativas: solo lo que falta. Combiná cuando tenga sentido.
-- Si el cliente no coopera tras 2 intentos, cerrá cordialmente y ofrecé hablar con un asesor humano.
+- Si el cliente no coopera tras 2 intentos, cerrá cordialmente SIN mencionar derivar a humano.
 
 REQUISITOS MÍNIMOS PARA AGENDAR VISITA
 1) Referencia clara de la propiedad: link, dirección, código, o barrio + detalle. Si no hay propiedad concreta → no se agenda. Solo sugerí opciones si el cliente lo pide.
@@ -39,14 +65,14 @@ REQUISITOS MÍNIMOS PARA AGENDAR VISITA
    - Necesita vender para comprar? Si sí, confirmar que su propiedad esté publicada (idealmente link).
    - Cómo financia: ahorro, crédito o mixto. Si crédito, confirmar preaprobación (banco y monto).
    - Si no tiene fondos ni crédito aprobado → no se agenda.
-6) Listo para cerrar: "Si la propiedad cumple lo que buscás, estás en condiciones de avanzar o hay algo que te frene?" Debe responder que sí (o condiciones ya cumplidas).
+6) Listo para cerrar: "Si la propiedad cumple lo que buscas, estas en condiciones de avanzar o hay algo que te frene?" Debe responder que sí (o condiciones ya cumplidas).
 
 CONDICIONES PARA NO AGENDAR
 - No tiene fondos ni crédito preaprobado.
 - Necesita vender pero aún no publicó su propiedad.
 - El decisor real no va a la visita.
 - No brinda info clave para precalificar.
-→ En estos casos, cerrá cordialmente, sin ofrecer visita, y ofrecé ayuda/asesoría.
+→ En estos casos, cerrá cordialmente, sin ofrecer visita. NO menciones derivar a humano.
 
 CONDICIONES PARA SÍ AGENDAR
 - Tiene dinero o crédito preaprobado.
@@ -57,20 +83,36 @@ CONDICIONES PARA SÍ AGENDAR
 
 OTRAS REGLAS
 - Si el cliente pide sugerencias, pedí 1-2 criterios clave y ofrecé 2-3 opciones (resumen breve). Si no lo pide, no envíes listados.
-- Si el cliente pide hablar con un humano, confirmá y ofrecé derivar.
+- SOLO si el cliente pregunta si sos un bot, se honesto y decí que sí sos un asistente virtual, y ofrecé derivar a humano.
+- SOLO si el cliente pide específicamente hablar con una persona, ofrecé derivar.
 - Mostrá empatía y claridad; no repitas preguntas ya respondidas.
 
-EJEMPLOS BREVES
+EJEMPLOS BREVES (SIN SIGNOS DE PREGUNTA INVERTIDOS)
+Cliente: "Hola buenas te hablo por la propiedad de nuñez"
+Gonzalo (si hay propiedades en Núñez): "Hola! Es para vos o para alguien más?"
+Gonzalo (si NO hay propiedades en Núñez): "No tengo propiedades disponibles en Núñez. Me podés dar más detalles? Link o dirección exacta?"
+
+EJEMPLO CRÍTICO - USO DE LISTA DE PROPIEDADES:
+Cliente: "Hola buenas te hablo por la propiedad de nuñez"
+Si la LISTA tiene propiedades de Núñez → "Hola! Es para vos o para alguien más?"
+Si la LISTA está vacía → "No tengo propiedades disponibles en Núñez. Me podés dar más detalles?"
+❌ INCORRECTO: "Hola, como estas?"
+❌ INCORRECTO: "Perfecto, me contactaste por la propiedad en Núñez" (repetir)
+❌ INCORRECTO: Continuar sin verificar que hay propiedades disponibles
+
 Cliente: "Quiero coordinar visita"
-Gonzalo: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Te contactaste por qué propiedad en particular?"
+Gonzalo: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Te contactaste por que propiedad en particular?"
 
 Cliente: "Es para mi, para mudarme"
-Gonzalo: "Perfecto. En qué plazo pensás mudarte y hace cuánto estás buscando?"
+Gonzalo: "Perfecto. En que plazo pensas mudarte y hace cuanto estas buscando?"
 
 Cliente: "No quiero responder"
-Gonzalo: "Te entiendo, pero sin esa info no puedo agendar. Es para no hacerte perder tiempo. Si preferís, te derivo con un asesor humano. Cómo querés seguir?"
+Gonzalo: "Te entiendo, pero sin esa info no puedo agendar. Es para no hacerte perder tiempo."
 
-Respondé siempre como una persona de inmobiliaria con experiencia.
+Cliente: "Sos un bot?"
+Gonzalo: "Si, soy un asistente virtual de la inmobiliaria. Si preferis hablar con un asesor humano, te puedo derivar."
+
+Respondé siempre como una persona de inmobiliaria con experiencia. NUNCA como asistente virtual.
 """
 
 def extract_slots(text: str) -> Dict[str, Any]:
@@ -178,7 +220,6 @@ Convertí montos: 150k=150000, 1.5M=1500000. Solo JSON:"""
             ]
             resp = client.chat.completions.create(
                 model=OPENAI_MODEL,
-                temperature=0.1,
                 messages=messages,
                 response_format={"type": "json_object"},
             )
@@ -238,7 +279,6 @@ Devolvé SOLO el JSON."""
         ]
         resp = client.chat.completions.create(
             model=OPENAI_MODEL,
-            temperature=0,
             messages=messages,
             response_format={"type": "json_object"},
         )
@@ -284,6 +324,54 @@ def format_datetime_for_user(iso_string: str) -> str:
         return "fecha no válida"
 
 
+def get_filtered_properties(lead_data: dict) -> list:
+    """
+    Obtiene propiedades filtradas según los datos del lead para pasarle a la IA.
+    """
+    try:
+        from services.dynamo import t_props
+        from boto3.dynamodb.conditions import Attr
+        
+        # Construir filtros
+        filter_expr = Attr("Status").eq("ACTIVE")
+        
+        # Filtrar por barrio si está disponible
+        neighborhood = lead_data.get("Neighborhood")
+        if neighborhood:
+            filter_expr = filter_expr & Attr("Neighborhood").eq(neighborhood)
+        
+        # Filtrar por número de ambientes si está disponible
+        rooms = lead_data.get("Rooms")
+        if rooms:
+            filter_expr = filter_expr & Attr("Rooms").eq(rooms)
+        
+        # Filtrar por presupuesto si está disponible
+        budget = lead_data.get("Budget")
+        if budget:
+            filter_expr = filter_expr & Attr("Price").lte(budget)
+        
+        resp = t_props.scan(FilterExpression=filter_expr, Limit=20)
+        items = resp.get("Items", [])
+        
+        # Convertir a formato nativo y simplificar para la IA
+        simplified_props = []
+        for item in items:
+            from models.schemas import dec_to_native
+            prop = dec_to_native(item)
+            simplified_props.append({
+                "PropertyId": prop.get("PropertyId"),
+                "Title": prop.get("Title"),
+                "Neighborhood": prop.get("Neighborhood"),
+                "Rooms": prop.get("Rooms"),
+                "Price": prop.get("Price"),
+                "URL": prop.get("URL")
+            })
+        
+        return simplified_props
+    except Exception as e:
+        print(f"[GET_FILTERED_PROPS][ERROR] {e}")
+        return []
+
 def generate_agent_response(conversation_history: list, lead_data: dict, property_context: dict = None) -> str:
     """
     Genera la respuesta del agente usando exclusivamente el LLM con historial.
@@ -292,141 +380,119 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
     # Llamar a OpenAI para generar la respuesta conversacional (si la API está disponible)
     if client:
         try:
-            # Construir contexto de propiedad (opcional)
+            # Obtener propiedades filtradas para pasarle a la IA
+            available_properties = get_filtered_properties(lead_data)
+            print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
+            if available_properties:
+                print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
+            
+            # Construir contexto de propiedades disponibles
             property_info = ""
-            if property_context:
-                prop_title = property_context.get("Title", "la propiedad")
-                prop_neighborhood = property_context.get("Neighborhood", "")
-                property_info = f"\nPROPIEDAD: {prop_title}"
-                if prop_neighborhood:
-                    property_info += f" en {prop_neighborhood}"
-                prop_price = property_context.get("Price")
-                if prop_price is not None:
-                    try:
-                        price_val = float(prop_price)
-                        if price_val >= 1000000:
-                            price_str = f"${price_val/1000000:.1f}M"
-                        elif price_val >= 1000:
-                            price_str = f"${int(price_val/1000)}k"
-                        else:
-                            price_str = f"${int(price_val)}"
-                    except Exception:
-                        price_str = str(prop_price)
-                    property_info += f" • Precio: {price_str}"
-                prop_rooms = property_context.get("Rooms")
-                if prop_rooms:
-                    try:
-                        rooms_num = int(prop_rooms)
-                        property_info += (" • 1 ambiente" if rooms_num == 1 else f" • {rooms_num} ambientes")
-                    except Exception:
-                        pass
-                prop_url = property_context.get("URL")
-                if prop_url:
-                    property_info += f" • Link: {prop_url}"
+            if available_properties:
+                property_info = f"\n🏠 PROPIEDADES DISPONIBLES ({len(available_properties)}):\n"
+                for i, prop in enumerate(available_properties[:10], 1):  # Máximo 10 para no saturar
+                    title = prop.get("Title", "Sin título")
+                    neighborhood = prop.get("Neighborhood", "")
+                    rooms = prop.get("Rooms", "")
+                    price = prop.get("Price", "")
+                    
+                    property_info += f"{i}. {title}"
+                    if neighborhood:
+                        property_info += f" - {neighborhood}"
+                    if rooms:
+                        property_info += f" - {rooms} amb"
+                    if price:
+                        try:
+                            price_val = float(price)
+                            if price_val >= 1000000:
+                                price_str = f"${price_val/1000000:.1f}M"
+                            elif price_val >= 1000:
+                                price_str = f"${int(price_val/1000)}k"
+                            else:
+                                price_str = f"${int(price_val)}"
+                            property_info += f" - {price_str}"
+                        except:
+                            pass
+                    property_info += "\n"
+                
+                property_info += "\nUSA ESTA LISTA para identificar la propiedad exacta que busca el cliente. Si no encuentras coincidencia exacta, pedí más detalles."
+            else:
+                # No hay propiedades que coincidan con los filtros
+                neighborhood = lead_data.get("Neighborhood")
+                if neighborhood:
+                    property_info = f"\n❌ LISTA VACÍA: NO HAY PROPIEDADES en {neighborhood}."
+                    property_info += f"\n🚨 RESPUESTA OBLIGATORIA: 'No tengo propiedades disponibles en {neighborhood}. Me podés dar más detalles? Link, dirección exacta o código?'"
+                    property_info += f"\n🚫 PROHIBIDO: NO hagas preguntas de precalificación como 'Es para vos o para alguien más?' cuando la lista está vacía."
+                    property_info += f"\n✅ SOLO pedí más detalles de la propiedad cuando no hay coincidencias."
+                else:
+                    property_info = "\n📋 NO HAY CRITERIOS ESPECÍFICOS aún. Necesitas más información del cliente."
 
             # Preparar mensajes: prompt de sistema + historial completo (reciente)
-            messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT + property_info}]
+            full_system_prompt = AGENT_SYSTEM_PROMPT + property_info
+            print(f"[DEBUG] System prompt length: {len(full_system_prompt)}")
+            print(f"[DEBUG] Property info: {property_info[:200]}...")
+            messages = [{"role": "system", "content": full_system_prompt}]
+            
+            # Agregar recordatorio de reglas antes del historial
+            if len(conversation_history) > 0:
+                reminder_content = "RECORDATORIO: NUNCA uses signos de pregunta invertidos (¿) ni emojis. Escribe siempre sin ¿ y sin emojis."
+                if not available_properties and lead_data.get("Neighborhood"):
+                    reminder_content += f" CRÍTICO: NO hay propiedades en {lead_data.get('Neighborhood')}. DEBES pedir más detalles, NO continúes con precalificación."
+                messages.append({
+                    "role": "system", 
+                    "content": reminder_content
+                })
+            
             # Limitar a últimos 20 mensajes para contexto suficiente
             for msg in conversation_history[-20:]:
                 messages.append(msg)
+            
+            print(f"[DEBUG] Enviando {len(messages)} mensajes a OpenAI")
+            print(f"[DEBUG] Último mensaje del usuario: {conversation_history[-1].get('content', '') if conversation_history else 'N/A'}")
 
             response = client.chat.completions.create(
                 model=OPENAI_MODEL,
-                temperature=0.4,
                 messages=messages,
-                max_tokens=220
+                max_completion_tokens=1000
             )
-            return response.choices[0].message.content.strip()
+            
+            print(f"[DEBUG] Respuesta recibida de OpenAI: '{response.choices[0].message.content}'")
+            
+            result = response.choices[0].message.content
+            if result is None:
+                print("[AI][ERROR] API retornó contenido None")
+                return None
+            
+            result = result.strip()
+            if not result:
+                print("[AI][ERROR] API retornó contenido vacío")
+                return None
+            
+            # Separar múltiples preguntas en mensajes individuales
+            if "?" in result and result.count("?") > 1:
+                # Dividir por preguntas y limpiar
+                parts = result.split("?")
+                messages = []
+                for part in parts:
+                    part = part.strip()
+                    if part and not part.endswith("."):
+                        messages.append(part + "?")
+                    elif part:
+                        messages.append(part)
+                
+                # Si hay múltiples mensajes, devolver solo el primero
+                # El webhook se encargará de enviar los siguientes
+                if len(messages) > 1:
+                    # Guardar los mensajes restantes en el lead para enviarlos después
+                    # Devolver el primer mensaje como string normal
+                    return messages[0]
+            
+            return result
         except Exception as e:
             print(f"[AGENT_RESPONSE][ERROR] {e}")
+            return None
 
-    # Fallback simple si no hay cliente o hubo error: respuesta humana mínima
-    last_user = ""
-    for msg in reversed(conversation_history):
-        if msg.get("role") == "user":
-            last_user = msg.get("content", "").strip()
-            break
-    if not conversation_history:
-        return "Hola! Soy Gonzalo de Compromiso Inmobiliario. Como puedo ayudarte?"
-    if last_user:
-        return "Gracias por tu mensaje. Contame un poco mas asi te ayudo mejor."
-    return "Te leo. Como queres que te ayude?"
+    # Si no hay cliente disponible, no responder nada
+    return None
 
 
-def detect_visit_request(conversation_history: list, current_message: str) -> bool:
-    """
-    Detecta si el cliente está pidiendo agendar una visita o está listo para hacerlo.
-    """
-    visit_keywords = [
-        "visita", "ver", "conocer", "mostrar", "recorrer", "coordinar", 
-        "agendar", "cita", "horario", "cuando puedo", "disponible"
-    ]
-    
-    current_lower = current_message.lower()
-    
-    # Buscar en el mensaje actual
-    for keyword in visit_keywords:
-        if keyword in current_lower:
-            return True
-    
-    # Buscar en los últimos mensajes del cliente
-    for msg in conversation_history[-3:]:
-        if msg.get("role") == "user":
-            msg_lower = msg.get("content", "").lower()
-            for keyword in visit_keywords:
-                if keyword in msg_lower:
-                    return True
-    
-    return False
-
-
-def analyze_qualification_status(lead_data: dict) -> dict:
-    """
-    Analiza qué información falta según el protocolo de precalificación.
-    
-    Returns:
-        {
-            "ready_for_visit": bool,
-            "missing_critical": list,
-            "missing_optional": list,
-            "next_question_type": str
-        }
-    """
-    # Datos críticos para agendar visita
-    critical_fields = {
-        "property_interest": lead_data.get("property_context") or lead_data.get("Neighborhood"),
-        "purpose": lead_data.get("Intent"),  # mudanza o inversión
-        "for_whom": True,  # asumir que es para el cliente si no dice lo contrario
-        "timeline": lead_data.get("timeline"),  # cuándo quiere mudarse/comprar
-    }
-    
-    # Datos opcionales pero importantes
-    optional_fields = {
-        "search_duration": lead_data.get("search_duration"),  # hace cuánto busca
-        "financing": lead_data.get("financing_type"),  # ahorro/crédito/venta
-        "needs_to_sell": lead_data.get("needs_to_sell"),
-        "budget": lead_data.get("Budget")
-    }
-    
-    missing_critical = [k for k, v in critical_fields.items() if not v]
-    missing_optional = [k for k, v in optional_fields.items() if not v]
-    
-    ready_for_visit = len(missing_critical) == 0
-    
-    # Determinar qué tipo de pregunta hacer siguiente
-    next_question_type = None
-    if "property_interest" in missing_critical:
-        next_question_type = "property_context"
-    elif "purpose" in missing_critical:
-        next_question_type = "mudanza_or_inversion"
-    elif "timeline" in missing_critical:
-        next_question_type = "timeline"
-    elif "financing" in missing_optional:
-        next_question_type = "financing"
-    
-    return {
-        "ready_for_visit": ready_for_visit,
-        "missing_critical": missing_critical,
-        "missing_optional": missing_optional,
-        "next_question_type": next_question_type
-    }

@@ -17,13 +17,10 @@ from routers.webhook import test_bot_message
 
 def main():
     """Función principal - simula webhook"""
-    if len(sys.argv) != 3:
-        print("Uso: python test_simple.py <numero_telefono> <mensaje>")
-        print("Ejemplo: python test_simple.py 1234567890 'Hola, me interesa una propiedad'")
-        sys.exit(1)
+
     
-    phone_number = sys.argv[1]
-    message = sys.argv[2]
+    phone_number = '0'
+    message = 'No lo tengo'
     
     print(f"📱 Número: {phone_number}")
     print(f"💬 Mensaje: {message}")

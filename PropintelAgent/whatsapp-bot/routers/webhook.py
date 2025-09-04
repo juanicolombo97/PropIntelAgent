@@ -81,6 +81,22 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
             for k, v in update_data.items():
                 lead[k] = v
         
+        # *** Flujo 0: Enviar mensajes pendientes si los hay ***
+        if lead.get("PendingMessages"):
+            pending_messages = lead.get("PendingMessages", [])
+            if pending_messages:
+                # Enviar el siguiente mensaje pendiente
+                next_message = pending_messages.pop(0)
+                put_message(lead_id, next_message, direction="out")
+                
+                # Actualizar la lista de mensajes pendientes
+                if pending_messages:
+                    update_lead(lead_id, {"PendingMessages": pending_messages})
+                else:
+                    update_lead(lead_id, {"PendingMessages": None})
+                
+                return PlainTextResponse(f"<Response><Message>{next_message}</Message></Response>", media_type="application/xml")
+        
         # Obtener el historial de conversación formateado (últimos 20 mensajes)
         conversation_history = get_conversation_history(lead_id, limit=20)
         
@@ -135,14 +151,42 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
         # (Sin flujo de ofertas/sugerencias automáticas: el LLM decide qué decir en base al prompt)
         
         # *** Flujo 4: Conversación general (aún faltan datos o uso de IA para responder) ***
-        reply_text = generate_agent_response(
+        response = generate_agent_response(
             conversation_history=conversation_history,
             lead_data=lead,
             property_context=property_context
         )
-        # Guardar respuesta generada del agente
-        put_message(lead_id, reply_text, direction="out")
-        return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+        
+        # Si no hay respuesta (API falló), no responder nada
+        if response is None:
+            return PlainTextResponse("", media_type="application/xml")
+        
+        # Verificar si la respuesta tiene múltiples preguntas y separarlas
+        if "?" in response and response.count("?") > 1:
+            # Dividir por preguntas y limpiar
+            parts = response.split("?")
+            messages = []
+            for part in parts:
+                part = part.strip()
+                if part and not part.endswith("."):
+                    messages.append(part + "?")
+                elif part:
+                    messages.append(part)
+            
+            if len(messages) > 1:
+                # Guardar primer mensaje
+                first_message = messages[0]
+                put_message(lead_id, first_message, direction="out")
+                
+                # Guardar mensajes restantes para enviar después
+                remaining_messages = messages[1:]
+                update_lead(lead_id, {"PendingMessages": remaining_messages})
+                
+                return PlainTextResponse(f"<Response><Message>{first_message}</Message></Response>", media_type="application/xml")
+        
+        # Respuesta única normal
+        put_message(lead_id, response, direction="out")
+        return PlainTextResponse(f"<Response><Message>{response}</Message></Response>", media_type="application/xml")
     
     except Exception as e:
         print(f"[WEBHOOK][ERROR] {e}")
@@ -240,6 +284,12 @@ def test_bot_message(phone_number: str, message: str, verbose: bool = True) -> s
             lead_data=lead,
             property_context=property_context
         )
+        
+        # Si no hay respuesta (API falló), no responder nada
+        if reply_text is None:
+            if verbose:
+                print("❌ No se pudo generar respuesta (API no disponible)")
+            return ""
         
         # Actualizar datos del lead si tenemos nueva información
         if any(slots.values()):
