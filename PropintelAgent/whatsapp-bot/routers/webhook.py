@@ -63,6 +63,22 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
         slots = extract_slots(message_text)
         lead = merge_profile(lead, slots)
         
+        # *** Flujo 0.5: Detectar si el mensaje contiene un link directo de propiedad ***
+        from services.ai import get_property_by_url
+        property_from_url = get_property_by_url(message_text)
+        if property_from_url and not lead.get("PendingPropertyId"):
+            # Se encontró propiedad por URL - setear directamente sin confirmación
+            property_id = property_from_url.get("PropertyId")
+            print(f"🔗 PROPIEDAD ENCONTRADA POR URL: {property_id}")
+            update_lead(lead_id, {"PendingPropertyId": property_id})
+            lead["PendingPropertyId"] = property_id
+            
+            # Respuesta directa sin pedir confirmación
+            prop_title = property_from_url.get("Title", "Sin título")
+            reply_text = f"Perfecto! Tengo la propiedad: {prop_title}. Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Es para vos o para alguien más?"
+            put_message(lead_id, reply_text, direction="out")
+            return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+
         # Si se obtuvieron datos nuevos, actualizar al lead en la base (Intent, Rooms, Budget, Neighborhood, Status)
         if any(slots.values()):
             update_data = {}
@@ -378,6 +394,23 @@ def test_bot_message(phone_number: str, message: str, verbose: bool = True) -> s
         
         if verbose:
             print(f"🔍 Slots detectados: {slots}")
+        
+        # *** Flujo 0.5: Detectar si el mensaje contiene un link directo de propiedad ***
+        from services.ai import get_property_by_url
+        property_from_url = get_property_by_url(message_text)
+        if property_from_url and not lead.get("PendingPropertyId"):
+            # Se encontró propiedad por URL - setear directamente sin confirmación
+            property_id = property_from_url.get("PropertyId")
+            if verbose:
+                print(f"🔗 PROPIEDAD ENCONTRADA POR URL: {property_id}")
+            update_lead(lead_id, {"PendingPropertyId": property_id})
+            lead["PendingPropertyId"] = property_id
+            
+            # Respuesta directa sin pedir confirmación
+            prop_title = property_from_url.get("Title", "Sin título")
+            reply_text = f"Perfecto! Tengo la propiedad: {prop_title}. Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Es para vos o para alguien más?"
+            put_message(lead_id, reply_text, direction="out")
+            return reply_text
         
         # *** Flujo 0: Esperando confirmación de propiedad ***
         if lead.get("Stage") == "AWAITING_PROPERTY_CONFIRMATION" and lead.get("PendingPropertyId"):
