@@ -39,8 +39,8 @@ def build_reply_legacy(lead: dict, last_text: str) -> str:
 @router.post("/webhook")
 async def webhook(From: str = Form(...), Body: str = Form(...)):
     """
-    Endpoint principal del webhook - Sistema de agente inmobiliario inteligente.
-    Usa toda la conversación para generar respuestas contextuales como un agente real.
+    Endpoint principal del webhook - Bot inmobiliario inteligente.
+    Procesa el mensaje entrante y genera una respuesta del agente Gonzalo.
     """
     try:
         lead_id = From
@@ -53,63 +53,105 @@ async def webhook(From: str = Form(...), Body: str = Form(...)):
                 media_type="application/xml"
             )
         
-        # Guardar mensaje entrante
+        # Guardar mensaje entrante del cliente
         put_message(lead_id, message_text, direction="in")
-
-        # Obtener o crear lead
+        
+        # Obtener (o crear) el perfil del lead
         lead = get_lead(lead_id)
         
-        # Extraer información básica del mensaje (para mantener datos estructurados)
+        # Extraer información estructurada del mensaje (intención, ambientes, presupuesto, barrio)
         slots = extract_slots(message_text)
         lead = merge_profile(lead, slots)
         
-        # Obtener historial completo de conversación
+        # Si se obtuvieron datos nuevos, actualizar al lead en la base (Intent, Rooms, Budget, Neighborhood, Status)
+        if any(slots.values()):
+            update_data = {}
+            if slots.get("intent"):
+                update_data["Intent"] = slots["intent"]
+            if slots.get("rooms") is not None:
+                update_data["Rooms"] = slots["rooms"]
+            if slots.get("budget") is not None:
+                update_data["Budget"] = slots["budget"]
+            if slots.get("neighborhood"):
+                update_data["Neighborhood"] = slots["neighborhood"]
+            # Determinar estatus (QUALIFIED si cumple datos críticos mínimos)
+            update_data["Status"] = "QUALIFIED" if qualifies(lead) else "NEW"
+            update_lead(lead_id, update_data)
+            # Reflejar cambios en el objeto lead local
+            for k, v in update_data.items():
+                lead[k] = v
+        
+        # Obtener el historial de conversación formateado (últimos 20 mensajes)
         conversation_history = get_conversation_history(lead_id, limit=20)
         
-        # Intentar identificar la propiedad específica por la que consulta
+        # Intentar identificar si el mensaje menciona una propiedad específica (por título, barrio u otros identificadores)
         property_context = get_property_by_context(lead, message_text)
         
-        # Generar respuesta como agente inmobiliario usando IA conversacional
+        # *** Flujo 1: Coordinación de visita - esperando fecha/hora del cliente ***
+        if lead.get("Stage") == "AWAITING_DATE" and lead.get("PendingPropertyId"):
+            # Si el cliente responde negativamente en lugar de dar una fecha (ej: "no", "más adelante")
+            if message_text.lower().startswith("no"):
+                clear_stage(lead)  # limpiar estado de espera
+                update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
+                reply_text = "Entiendo. No te preocupes, podemos coordinar en otro momento. Cualquier otra consulta, estoy a tu disposición."
+                # Guardar respuesta del agente y retornar
+                put_message(lead_id, reply_text, direction="out")
+                return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+            # Intentar interpretar la fecha/hora proporcionada por el cliente
+            date_data = parse_visit_datetime(message_text)
+            visit_iso = date_data.get("iso")
+            if visit_iso:
+                # Crear registro de la visita en DynamoDB (estado pendiente de confirmación)
+                create_visit(lead_id, lead["PendingPropertyId"], visit_iso)
+                # Limpiar el estado de espera en el lead
+                clear_stage(lead)
+                update_lead(lead_id, {"Stage": None, "PendingPropertyId": None})
+                # Formatear la fecha para la respuesta al cliente
+                fecha_str = format_datetime_for_user(visit_iso)
+                reply_text = f"¡Listo! He registrado tu solicitud de visita para {fecha_str}. Te confirmaremos los detalles a la brevedad. ¡Gracias!"
+            else:
+                # No se entendió la fecha; pedir al cliente que reintente con otro formato
+                reply_text = ("Disculpá, no pude entender la fecha u hora que mencionaste. "
+                              "Por favor indicame un día y horario para la visita (por ej.: viernes 15hs o mañana 10:00).")
+            # Guardar respuesta del agente y retornar
+            put_message(lead_id, reply_text, direction="out")
+            return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+        
+        # *** Flujo 2: Cliente elige una propiedad sugerida por número/ID ***
+        chosen_property_id = choose_property_from_reply(lead, message_text)
+        if chosen_property_id:
+            # Configurar estado de espera de fecha para la propiedad elegida
+            set_stage_awaiting_date(lead, chosen_property_id)
+            update_lead(lead_id, {"Stage": "AWAITING_DATE", "PendingPropertyId": chosen_property_id})
+            # Obtener detalles básicos de la propiedad (para referencia en la respuesta)
+            prop_item = t_props.get_item(Key={"PropertyId": chosen_property_id}).get("Item")
+            neighborhood = prop_item.get("Neighborhood") if prop_item else None
+            prop_ref = f"la propiedad en {neighborhood}" if neighborhood else "esa propiedad"
+            reply_text = f"¡Excelente elección! Vamos a coordinar una visita para {prop_ref}. Que día y horario te gustaría ir a verla?"
+            # Guardar respuesta del agente y retornar
+            put_message(lead_id, reply_text, direction="out")
+            return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+        
+        # (Sin flujo de ofertas/sugerencias automáticas: el LLM decide qué decir en base al prompt)
+        
+        # *** Flujo 4: Conversación general (aún faltan datos o uso de IA para responder) ***
         reply_text = generate_agent_response(
             conversation_history=conversation_history,
             lead_data=lead,
             property_context=property_context
         )
-        
-        # Actualizar datos del lead si tenemos nueva información
-        if any(slots.values()):
-            update_data = {}
-            if slots.get("intent"):
-                update_data["Intent"] = slots["intent"]
-            if slots.get("rooms"):
-                update_data["Rooms"] = slots["rooms"]
-            if slots.get("budget"):
-                update_data["Budget"] = slots["budget"]
-            if slots.get("neighborhood"):
-                update_data["Neighborhood"] = slots["neighborhood"]
-            
-            # Determinar estado del lead
-            status = "QUALIFIED" if qualifies(lead) else "NEW"
-            update_data["Status"] = status
-            
-            if update_data:
-                update_lead(lead_id, update_data)
-
-        # Guardar respuesta del agente
+        # Guardar respuesta generada del agente
         put_message(lead_id, reply_text, direction="out")
-        
-        # Retornar respuesta en formato TwiML
-        xml = f"<Response><Message>{reply_text}</Message></Response>"
-        return PlainTextResponse(xml, media_type="application/xml")
-        
+        return PlainTextResponse(f"<Response><Message>{reply_text}</Message></Response>", media_type="application/xml")
+    
     except Exception as e:
         print(f"[WEBHOOK][ERROR] {e}")
-        error_response = ("Disculpa, tuve un problema técnico. "
-                         "Podes intentar de nuevo en un momento? "
-                         "Si el problema persiste, contacta a nuestro equipo.")
-        xml = f"<Response><Message>{error_response}</Message></Response>"
-        return PlainTextResponse(xml, media_type="application/xml")
-
+        error_msg = ("Disculpa, tuve un inconveniente técnico. "
+                     "Por favor intentá nuevamente en unos minutos. "
+                     "Si el problema persiste, contactá a nuestro equipo.")
+        return PlainTextResponse(f"<Response><Message>{error_msg}</Message></Response>", media_type="application/xml")
+    
+    
 # ---- Endpoints panel ----
 @router.get("/lead")
 def lead(lead_id: str):

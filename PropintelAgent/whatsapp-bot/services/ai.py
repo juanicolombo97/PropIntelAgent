@@ -11,58 +11,67 @@ if OPENAI_API_KEY:
     except Exception:
         client = None
 
-AGENT_SYSTEM_PROMPT = """Sos Gonzalo, un agente inmobiliario profesional de Compromiso Inmobiliario en Argentina. 
+AGENT_SYSTEM_PROMPT = """Sos Gonzalo, agente inmobiliario profesional de Compromiso Inmobiliario (Argentina).
 
-PERSONALIDAD Y ESTILO:
-- Profesional pero cercano, como un agente real
-- Usás lenguaje natural argentino sin ser demasiado formal
-- NUNCA usás signos de pregunta invertidos (¿) - escribís "como estas?" NO "¿como estás?"
-- NUNCA usás emojis (el cliente va a pensar que sos un bot)
-- Sonás como una persona real, no como un asistente virtual
+ROL Y TONO
+- Profesional y cercano, humano, sin sonar a asistente virtual
+- Español argentino, natural y directo
+- Nunca uses emojis ni signos de pregunta invertidos (escribís "como estas?")
+- Frases cortas, una sola pregunta por mensaje cuando sea posible
 
-TU OBJETIVO: Precalificar al cliente y agendar visitas útiles siguiendo el protocolo.
+OBJETIVO
+- Llevar una conversación natural para precalificar y, solo si corresponde, proponer visita.
+- Si el cliente pide, podés derivar a un humano con tacto.
 
-PROTOCOLO DE PRECALIFICACION (en orden - ADAPTATIVO):
-1. ORIGEN Y MOTIVACIÓN:
-   - Por cuál propiedad te contactaste?
-   - Esta propiedad sería para vos o para alguien más?
-   - Estás buscando para mudarte o invertir?
-   - Tenés un tiempo definido o urgencia para definir tu compra?
-   - Hace cuánto comenzaste tu búsqueda?
+POLÍTICA DE CONVERSACIÓN
+- Saludo inicial breve y humano. Si el cliente menciona una propiedad, usá esa referencia.
+- No ofrezcas visita si no hay propiedad concreta ni si faltan requisitos mínimos.
+- No preguntes "alquilar o comprar" si ya se deduce del contexto (ej: dijo "quiero comprar").
+- Hacé preguntas adaptativas: solo lo que falta. Combiná cuando tenga sentido.
+- Si el cliente no coopera tras 2 intentos, cerrá cordialmente y ofrecé hablar con un asesor humano.
 
-2. CAPACIDAD ECONÓMICA:
-   - Necesitás vender para comprar?
-   - Si necesitás vender, esa propiedad ya está en venta? hace cuánto? me pasas el link?
-   - Si tu compra es con crédito, ya está aprobado? de qué banco es?
+REQUISITOS MÍNIMOS PARA AGENDAR VISITA
+1) Referencia clara de la propiedad: link, dirección, código, o barrio + detalle. Si no hay propiedad concreta → no se agenda. Solo sugerí opciones si el cliente lo pide.
+2) Para quién es la compra: confirmar si es para él/ella u otra persona. La visita debe ser con quien decide.
+3) Motivo de búsqueda: mudanza o inversión.
+4) Plazo y antigüedad de búsqueda: en cuánto tiempo piensa concretar y hace cuánto busca.
+5) Capacidad económica:
+   - Necesita vender para comprar? Si sí, confirmar que su propiedad esté publicada (idealmente link).
+   - Cómo financia: ahorro, crédito o mixto. Si crédito, confirmar preaprobación (banco y monto).
+   - Si no tiene fondos ni crédito aprobado → no se agenda.
+6) Listo para cerrar: "Si la propiedad cumple lo que buscás, estás en condiciones de avanzar o hay algo que te frene?" Debe responder que sí (o condiciones ya cumplidas).
 
-3. CAPTACIÓN:
-   - Podemos ofrecerte una tasación gratuita?
+CONDICIONES PARA NO AGENDAR
+- No tiene fondos ni crédito preaprobado.
+- Necesita vender pero aún no publicó su propiedad.
+- El decisor real no va a la visita.
+- No brinda info clave para precalificar.
+→ En estos casos, cerrá cordialmente, sin ofrecer visita, y ofrecé ayuda/asesoría.
 
-REGLAS CRÍTICAS:
-- PRECALIFICACIÓN ADAPTATIVA: Solo preguntá lo que falta según lo que ya respondieron
-- Si quieren agendar sin dar info: explicá que el sistema te pide datos para agendar
-- Si no cooperan después de 2 intentos: cerrá cordialmente
-- Combiná preguntas cuando tenga sentido: "La propiedad sería para vos y la idea es mudarte o invertir?"
+CONDICIONES PARA SÍ AGENDAR
+- Tiene dinero o crédito preaprobado.
+- No depende de vender (o si depende, ya tiene la propiedad publicada en venta).
+- La visita la hace quien decide.
+- Responde que puede avanzar si le gusta.
+→ En este escenario, proponé directamente día y hora concretos (no preguntes abierto). Mantené el tono humano.
 
-EJEMPLOS DE CONVERSACIÓN:
+OTRAS REGLAS
+- Si el cliente pide sugerencias, pedí 1-2 criterios clave y ofrecé 2-3 opciones (resumen breve). Si no lo pide, no envíes listados.
+- Si el cliente pide hablar con un humano, confirmá y ofrecé derivar.
+- Mostrá empatía y claridad; no repitas preguntas ya respondidas.
 
-Inicio típico:
-Cliente: "Hola, me interesa la propiedad de Núñez"
-Gonzalo: "Hola! Soy Gonzalo de Compromiso Inmobiliario. Me escribiste por el departamento de Núñez. Decime como te puedo ayudar?"
-
-Si piden coordinar:
+EJEMPLOS BREVES
 Cliente: "Quiero coordinar visita"
-Gonzalo: "Por el departamento de Núñez puedo coordinarte visita, pero antes necesito confirmar unos datos que pide el sistema. Lo resolvemos rápido y seguimos."
+Gonzalo: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Te contactaste por qué propiedad en particular?"
 
-Precalificación adaptativa:
-Cliente: "Es para mí, para mudarme"
-Gonzalo: "Perfecto. En qué plazo te gustaría mudarte y hace cuánto empezaste a buscar?"
+Cliente: "Es para mi, para mudarme"
+Gonzalo: "Perfecto. En qué plazo pensás mudarte y hace cuánto estás buscando?"
 
-Si no cooperan:
-Cliente: "No quiero responder eso"
-Gonzalo: "Te entiendo, pero sin esa información no puedo agendar la visita. Es parte de nuestra forma de trabajar para no hacerte perder tiempo."
+Cliente: "No quiero responder"
+Gonzalo: "Te entiendo, pero sin esa info no puedo agendar. Es para no hacerte perder tiempo. Si preferís, te derivo con un asesor humano. Cómo querés seguir?"
 
-NUNCA escribas como robot. Sonás como una persona que trabajo en inmobiliaria hace años."""
+Respondé siempre como una persona de inmobiliaria con experiencia.
+"""
 
 def extract_slots(text: str) -> Dict[str, Any]:
     """
@@ -277,71 +286,13 @@ def format_datetime_for_user(iso_string: str) -> str:
 
 def generate_agent_response(conversation_history: list, lead_data: dict, property_context: dict = None) -> str:
     """
-    Genera una respuesta como agente inmobiliario basada en toda la conversación.
-    Funciona con y sin OpenAI usando lógica inteligente.
+    Genera la respuesta del agente usando exclusivamente el LLM con historial.
+    No aplica reglas conversacionales hardcodeadas; toda la lógica vive en el prompt.
     """
-    # Analizar el último mensaje del usuario
-    last_user_message = ""
-    for msg in reversed(conversation_history):
-        if msg.get("role") == "user":
-            last_user_message = msg.get("content", "").lower()
-            break
-    
-    # Detectar si es el primer mensaje
-    is_first_message = len(conversation_history) == 0 or (
-        len(conversation_history) == 1 and conversation_history[0].get("role") == "user"
-    )
-    
-    # Detectar mención de propiedad específica
-    property_mentioned = any(word in last_user_message for word in ["propiedad", "departamento", "casa", "ph", "monoambiente"])
-    neighborhood_mentioned = any(word in last_user_message for word in ["nuñez", "palermo", "belgrano", "recoleta", "san telmo"])
-    
-    # RESPUESTAS BASADAS EN CONTEXTO Y REGLAS
-    
-    # Primera interacción con mención de propiedad o segunda interacción que menciona propiedad específica
-    if (is_first_message and (property_mentioned or neighborhood_mentioned)) or \
-       (len(conversation_history) == 2 and (property_mentioned or neighborhood_mentioned)):
-        
-        neighborhood = None
-        
-        # Extraer barrio mencionado
-        barrios = {
-            "nuñez": "Núñez", "palermo": "Palermo", "belgrano": "Belgrano", 
-            "recoleta": "Recoleta", "san telmo": "San Telmo", "puerto madero": "Puerto Madero",
-            "villa crespo": "Villa Crespo", "caballito": "Caballito"
-        }
-        
-        for barrio_key, barrio_nombre in barrios.items():
-            if barrio_key in last_user_message:
-                neighborhood = barrio_nombre
-                break
-        
-        # Si es el primer mensaje
-        if is_first_message:
-            if neighborhood:
-                return f"Hola! Soy Gonzalo de Compromiso Inmobiliario. Me escribiste por la propiedad de {neighborhood}. Decime como te puedo ayudar?"
-            else:
-                return "Hola! Soy Gonzalo de Compromiso Inmobiliario. Me escribiste por una propiedad. Decime como te puedo ayudar?"
-        
-        # Si es el segundo mensaje aclarando la propiedad
-        elif len(conversation_history) == 2:
-            if neighborhood:
-                return f"Perfecto! Me escribiste por la propiedad de {neighborhood}. Decime, esta propiedad sería para vos o para alguien más?"
-            else:
-                return "Entiendo, me contactaste por una propiedad. Decime, sería para vos o para alguien más?"
-    
-    # Respuesta a solicitud de visita
-    if any(word in last_user_message for word in ["visita", "ver", "conocer", "coordinar", "agendar"]):
-        missing = lead_data.get("Missing", [])
-        if missing:
-            return "Me gustaría coordinarte la visita, pero antes necesito confirmar unos datos que pide el sistema. Lo resolvemos rápido y seguimos. Por cuál propiedad específica te contactaste?"
-        else:
-            return "Perfecto! Puedo coordinarte la visita. Que día y horario te viene bien?"
-    
-    # Si OpenAI está disponible, usar IA
+    # Llamar a OpenAI para generar la respuesta conversacional (si la API está disponible)
     if client:
         try:
-            # Construir contexto
+            # Construir contexto de propiedad (opcional)
             property_info = ""
             if property_context:
                 prop_title = property_context.get("Title", "la propiedad")
@@ -349,54 +300,57 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
                 property_info = f"\nPROPIEDAD: {prop_title}"
                 if prop_neighborhood:
                     property_info += f" en {prop_neighborhood}"
-            
-            messages = [
-                {"role": "system", "content": AGENT_SYSTEM_PROMPT + property_info}
-            ]
-            
-            # Agregar historial reciente
-            for msg in conversation_history[-6:]:
+                prop_price = property_context.get("Price")
+                if prop_price is not None:
+                    try:
+                        price_val = float(prop_price)
+                        if price_val >= 1000000:
+                            price_str = f"${price_val/1000000:.1f}M"
+                        elif price_val >= 1000:
+                            price_str = f"${int(price_val/1000)}k"
+                        else:
+                            price_str = f"${int(price_val)}"
+                    except Exception:
+                        price_str = str(prop_price)
+                    property_info += f" • Precio: {price_str}"
+                prop_rooms = property_context.get("Rooms")
+                if prop_rooms:
+                    try:
+                        rooms_num = int(prop_rooms)
+                        property_info += (" • 1 ambiente" if rooms_num == 1 else f" • {rooms_num} ambientes")
+                    except Exception:
+                        pass
+                prop_url = property_context.get("URL")
+                if prop_url:
+                    property_info += f" • Link: {prop_url}"
+
+            # Preparar mensajes: prompt de sistema + historial completo (reciente)
+            messages = [{"role": "system", "content": AGENT_SYSTEM_PROMPT + property_info}]
+            # Limitar a últimos 20 mensajes para contexto suficiente
+            for msg in conversation_history[-20:]:
                 messages.append(msg)
-            
+
             response = client.chat.completions.create(
                 model=OPENAI_MODEL,
-                temperature=0.7,
+                temperature=0.4,
                 messages=messages,
-                max_tokens=150
+                max_tokens=220
             )
-            
             return response.choices[0].message.content.strip()
-            
         except Exception as e:
             print(f"[AGENT_RESPONSE][ERROR] {e}")
-            # Continuar con lógica de reglas si falla OpenAI
-    
-    # LÓGICA DE REGLAS PARA PRECALIFICACIÓN
-    missing = lead_data.get("Missing", [])
-    
-    # Preguntar por datos faltantes siguiendo el protocolo
-    if "Intent" in missing:
-        return "Para ayudarte mejor, me decis si estás buscando para alquilar o comprar?"
-    
-    if "Neighborhood" in missing:
-        return "En qué zona o barrio te gustaría?"
-    
-    # Si mencionan que es para mudanza o inversión
-    if any(word in last_user_message for word in ["mudarme", "mudanza", "vivir"]):
-        return "Perfecto, es para mudarte. En qué plazo te gustaría mudarte y hace cuánto empezaste a buscar?"
-    
-    if any(word in last_user_message for word in ["inversion", "invertir", "negocio"]):
-        return "Entiendo, es para inversión. Tenes experiencia invirtiendo en inmuebles?"
-    
-    # Respuestas según contexto de información disponible
-    if not missing:  # Lead calificado
-        return "Perfecto! Con estos datos puedo mostrarte las mejores opciones disponibles. Te paso algunas propiedades que pueden interesarte y coordinamos visita."
-    
-    # Respuesta por defecto contextual
-    if is_first_message:
-        return "Hola! Soy Gonzalo de Compromiso Inmobiliario. Como puedo ayudarte hoy?"
-    
-    return "Entiendo. Contame un poco más para poder ayudarte mejor."
+
+    # Fallback simple si no hay cliente o hubo error: respuesta humana mínima
+    last_user = ""
+    for msg in reversed(conversation_history):
+        if msg.get("role") == "user":
+            last_user = msg.get("content", "").strip()
+            break
+    if not conversation_history:
+        return "Hola! Soy Gonzalo de Compromiso Inmobiliario. Como puedo ayudarte?"
+    if last_user:
+        return "Gracias por tu mensaje. Contame un poco mas asi te ayudo mejor."
+    return "Te leo. Como queres que te ayude?"
 
 
 def detect_visit_request(conversation_history: list, current_message: str) -> bool:
