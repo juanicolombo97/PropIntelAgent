@@ -45,9 +45,10 @@ OBJETIVO
 
 POLÍTICA DE CONVERSACIÓN
 - CRÍTICO: Siempre recibirás una lista de PROPIEDADES DISPONIBLES filtradas. USA esta lista para identificar exactamente de qué propiedad habla el cliente.
-- Si la lista está VACÍA y el cliente mencionó un barrio → DEBES responder: "No tengo propiedades disponibles en [barrio]. Me podés dar más detalles? Link, dirección exacta o código?"
-- Si encuentras una coincidencia exacta en la lista → seguí directo con precalificación: "Hola! Es para vos o para alguien más?"
-- Si NO hay coincidencia exacta pero hay propiedades → pedí más detalles: "Hola! Me podés dar más detalles? Link, dirección exacta o código?"
+- Si la lista está VACÍA y el cliente mencionó un barrio → DEBES responder: "No tengo propiedades disponibles en [barrio]. Me podés dar más detalles? Título completo o link?"
+- Si encuentras UNA SOLA coincidencia exacta en la lista → seguí directo con precalificación: "Es para vos o para alguien más?" (NO digas "Hola" si ya conversaron)
+- Si hay MÚLTIPLES propiedades en la lista → identificar cuál específicamente: "Tengo varias propiedades en [barrio]. Cuál te interesa? Me podés dar el título o algún detalle específico?" (primer mensaje: agregar "Hola!")
+- Si NO hay propiedades en la lista → pedí más detalles: "No tengo propiedades disponibles en [barrio]. Me podés dar más detalles? Título completo o link?"
 - JAMÁS repitas lo que el cliente ya dijo. Un humano no dice "me contactaste por la propiedad en X".
 - NUNCA respondas "Hola, como estas?" si hay contexto de propiedad específica.
 - NUNCA continúes con precalificación si no encontraste una propiedad específica.
@@ -88,17 +89,21 @@ OTRAS REGLAS
 - Mostrá empatía y claridad; no repitas preguntas ya respondidas.
 
 EJEMPLOS BREVES (SIN SIGNOS DE PREGUNTA INVERTIDOS)
-Cliente: "Hola buenas te hablo por la propiedad de nuñez"
-Gonzalo (si hay propiedades en Núñez): "Hola! Es para vos o para alguien más?"
-Gonzalo (si NO hay propiedades en Núñez): "No tengo propiedades disponibles en Núñez. Me podés dar más detalles? Link o dirección exacta?"
+PRIMER MENSAJE:
+Cliente: "Hola buenas te hablo por la propiedad de palermo"
+Gonzalo (1 propiedad): "Hola! Es para vos o para alguien más?"
+Gonzalo (múltiples propiedades): "Hola! Tengo varias propiedades en Palermo. Cuál te interesa?"
+Gonzalo (0 propiedades): "Hola! No tengo propiedades disponibles en Palermo. Me podés dar más detalles?"
 
-EJEMPLO CRÍTICO - USO DE LISTA DE PROPIEDADES:
-Cliente: "Hola buenas te hablo por la propiedad de nuñez"
-Si la LISTA tiene propiedades de Núñez → "Hola! Es para vos o para alguien más?"
-Si la LISTA está vacía → "No tengo propiedades disponibles en Núñez. Me podés dar más detalles?"
-❌ INCORRECTO: "Hola, como estas?"
-❌ INCORRECTO: "Perfecto, me contactaste por la propiedad en Núñez" (repetir)
-❌ INCORRECTO: Continuar sin verificar que hay propiedades disponibles
+CONVERSACIÓN EN CURSO (YA SE SALUDARON):
+Cliente: "Había visto un dos ambientes"
+Gonzalo (1 propiedad): "Es para vos o para alguien más?" (SIN "Hola")
+Gonzalo (múltiples propiedades): "Tengo varias opciones de 2 ambientes. Cuál te interesa?" (SIN "Hola")
+
+EJEMPLO CRÍTICO - CONTEXTO DE CONVERSACIÓN:
+✅ PRIMER MENSAJE: "Hola! Es para vos o para alguien más?"
+✅ CONVERSACIÓN EN CURSO: "Es para vos o para alguien más?" (SIN saludo)
+❌ INCORRECTO: Saludar nuevamente en una conversación en curso
 
 Cliente: "Quiero coordinar visita"
 Gonzalo: "Puedo coordinarte, pero antes necesito confirmar algunos datos que me pide el sistema. Lo vemos rápido y seguimos. Te contactaste por que propiedad en particular?"
@@ -372,6 +377,64 @@ def get_filtered_properties(lead_data: dict) -> list:
         print(f"[GET_FILTERED_PROPS][ERROR] {e}")
         return []
 
+def get_fallback_properties(lead_data: dict) -> list:
+    """
+    Obtiene propiedades con criterios relajados para ofrecer alternativas.
+    Solo se usa cuando no se encuentra la propiedad específica después de varios intentos.
+    """
+    try:
+        from services.dynamo import t_props
+        from boto3.dynamodb.conditions import Attr
+        
+        # Criterios disponibles
+        neighborhood = lead_data.get("Neighborhood")
+        rooms = lead_data.get("Rooms")
+        budget = lead_data.get("Budget")
+        
+        # Contar criterios no nulos
+        criteria_count = sum([1 for x in [neighborhood, rooms, budget] if x is not None])
+        
+        # Solo buscar alternativas si hay al menos 2 criterios
+        if criteria_count < 2:
+            return []
+        
+        # Buscar propiedades que cumplan al menos 2 de los 3 criterios
+        filter_expr = Attr("Status").eq("ACTIVE")
+        
+        # Si tenemos presupuesto y ambientes, buscar por esos (sin barrio)
+        if budget and rooms:
+            filter_expr = filter_expr & Attr("Price").lte(budget) & Attr("Rooms").eq(rooms)
+        # Si tenemos barrio y ambientes, buscar por esos (sin presupuesto)
+        elif neighborhood and rooms:
+            filter_expr = filter_expr & Attr("Neighborhood").eq(neighborhood) & Attr("Rooms").eq(rooms)
+        # Si tenemos barrio y presupuesto, buscar por esos (sin ambientes)
+        elif neighborhood and budget:
+            filter_expr = filter_expr & Attr("Neighborhood").eq(neighborhood) & Attr("Price").lte(budget)
+        else:
+            return []
+        
+        resp = t_props.scan(FilterExpression=filter_expr, Limit=10)
+        items = resp.get("Items", [])
+        
+        # Convertir a formato nativo y simplificar
+        simplified_props = []
+        for item in items:
+            from models.schemas import dec_to_native
+            prop = dec_to_native(item)
+            simplified_props.append({
+                "PropertyId": prop.get("PropertyId"),
+                "Title": prop.get("Title"),
+                "Neighborhood": prop.get("Neighborhood"),
+                "Rooms": prop.get("Rooms"),
+                "Price": prop.get("Price"),
+                "URL": prop.get("URL")
+            })
+        
+        return simplified_props
+    except Exception as e:
+        print(f"[GET_FALLBACK_PROPS][ERROR] {e}")
+        return []
+
 def generate_agent_response(conversation_history: list, lead_data: dict, property_context: dict = None) -> str:
     """
     Genera la respuesta del agente usando exclusivamente el LLM con historial.
@@ -385,6 +448,14 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
             print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
             if available_properties:
                 print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
+            
+            # Contar cuántas veces se ha preguntado por más detalles (aproximación por historial)
+            property_detail_requests = 0
+            for msg in conversation_history[-6:]:  # Últimos 6 mensajes
+                if msg.get("role") == "assistant" and any(word in msg.get("content", "").lower() for word in ["detalles", "link", "dirección", "código"]):
+                    property_detail_requests += 1
+            
+            print(f"[DEBUG] Intentos de obtener detalles: {property_detail_requests}")
             
             # Construir contexto de propiedades disponibles
             property_info = ""
@@ -415,15 +486,63 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
                             pass
                     property_info += "\n"
                 
-                property_info += "\nUSA ESTA LISTA para identificar la propiedad exacta que busca el cliente. Si no encuentras coincidencia exacta, pedí más detalles."
+                # Determinar si es primer mensaje o conversación en curso
+                is_first_message = len(conversation_history) <= 1
+                greeting = "Hola! " if is_first_message else ""
+                
+                if len(available_properties) == 1:
+                    property_info += "\n✅ UNA SOLA PROPIEDAD encontrada. Continúa con precalificación."
+                    property_info += f"\nRespuesta: '{greeting}Es para vos o para alguien más?'"
+                else:
+                    property_info += "\nCRÍTICO: Hay MÚLTIPLES propiedades. DEBES identificar cuál específicamente busca el cliente."
+                    property_info += f"\nRespuesta: '{greeting}Tengo varias propiedades en {lead_data.get('Neighborhood', 'esa zona')}. Cuál te interesa? Me podés dar el título o algún detalle específico?'"
+                    property_info += "\nNO continúes con precalificación hasta saber la propiedad exacta."
             else:
                 # No hay propiedades que coincidan con los filtros
                 neighborhood = lead_data.get("Neighborhood")
                 if neighborhood:
-                    property_info = f"\n❌ LISTA VACÍA: NO HAY PROPIEDADES en {neighborhood}."
-                    property_info += f"\n🚨 RESPUESTA OBLIGATORIA: 'No tengo propiedades disponibles en {neighborhood}. Me podés dar más detalles? Link, dirección exacta o código?'"
-                    property_info += f"\n🚫 PROHIBIDO: NO hagas preguntas de precalificación como 'Es para vos o para alguien más?' cuando la lista está vacía."
-                    property_info += f"\n✅ SOLO pedí más detalles de la propiedad cuando no hay coincidencias."
+                    # Si ya se pidieron detalles 3+ veces, ofrecer alternativas o cerrar
+                    if property_detail_requests >= 3:
+                        fallback_properties = get_fallback_properties(lead_data)
+                        if fallback_properties:
+                            property_info = f"\n🔄 FALLBACK: Después de {property_detail_requests} intentos, ofrecer alternativas."
+                            property_info += f"\n🏠 PROPIEDADES ALTERNATIVAS ({len(fallback_properties)}):\n"
+                            for i, prop in enumerate(fallback_properties[:5], 1):
+                                title = prop.get("Title", "Sin título")
+                                prop_neighborhood = prop.get("Neighborhood", "")
+                                rooms = prop.get("Rooms", "")
+                                price = prop.get("Price", "")
+                                
+                                property_info += f"{i}. {title}"
+                                if prop_neighborhood:
+                                    property_info += f" - {prop_neighborhood}"
+                                if rooms:
+                                    property_info += f" - {rooms} amb"
+                                if price:
+                                    try:
+                                        price_val = float(price)
+                                        if price_val >= 1000000:
+                                            price_str = f"${price_val/1000000:.1f}M"
+                                        elif price_val >= 1000:
+                                            price_str = f"${int(price_val/1000)}k"
+                                        else:
+                                            price_str = f"${int(price_val)}"
+                                        property_info += f" - {price_str}"
+                                    except:
+                                        pass
+                                property_info += "\n"
+                            property_info += f"\nRespuesta: 'No tenemos esa propiedad específica en {neighborhood}. Te muestro opciones similares que tenemos disponibles:' y luego lista las propiedades."
+                        else:
+                            # No hay alternativas O no hay suficientes criterios - cerrar conversación
+                            property_info = f"\n❌ CERRAR CONVERSACIÓN: Después de {property_detail_requests} intentos sin éxito."
+                            property_info += f"\nRespuesta: 'Lamentablemente no tenemos propiedades que coincidan con lo que buscás.'"
+                    else:
+                        # Primer o segundo intento - seguir pidiendo detalles
+                        property_info = f"\n❌ LISTA VACÍA: NO HAY PROPIEDADES en {neighborhood}."
+                        property_info += f"\n🚨 RESPUESTA OBLIGATORIA: 'No tengo propiedades disponibles en {neighborhood}. Me podés dar más detalles? Título completo o link?'"
+                        property_info += f"\n🚫 PROHIBIDO: NO hagas preguntas de precalificación como 'Es para vos o para alguien más?' cuando la lista está vacía."
+                        property_info += f"\n🚫 PROHIBIDO: NO pidas 'dirección exacta' o 'código' (no existen en la base de datos)."
+                        property_info += f"\n✅ SOLO pedí: título completo o link (campos que SÍ existen)."
                 else:
                     property_info = "\n📋 NO HAY CRITERIOS ESPECÍFICOS aún. Necesitas más información del cliente."
 
@@ -449,6 +568,14 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
             
             print(f"[DEBUG] Enviando {len(messages)} mensajes a OpenAI")
             print(f"[DEBUG] Último mensaje del usuario: {conversation_history[-1].get('content', '') if conversation_history else 'N/A'}")
+            
+            # Debug: Mostrar mensajes que se envían a la API
+            print("[DEBUG] === MENSAJES ENVIADOS A API ===")
+            for i, msg in enumerate(messages):
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                print(f"[DEBUG] {i+1}. {role.upper()}: {content[:100]}...")
+            print("[DEBUG] === FIN MENSAJES ===")
 
             response = client.chat.completions.create(
                 model=OPENAI_MODEL,

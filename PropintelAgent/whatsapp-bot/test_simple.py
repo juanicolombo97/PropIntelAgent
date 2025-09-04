@@ -19,8 +19,8 @@ def main():
     """Función principal - simula webhook"""
 
     
-    phone_number = '0'
-    message = 'No lo tengo'
+    phone_number = '4'
+    message = 'es mi hijo igual asique puedo decidir por el'
     
     print(f"📱 Número: {phone_number}")
     print(f"💬 Mensaje: {message}")
