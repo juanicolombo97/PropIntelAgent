@@ -440,186 +440,212 @@ def generate_agent_response(conversation_history: list, lead_data: dict, propert
     Genera la respuesta del agente usando exclusivamente el LLM con historial.
     No aplica reglas conversacionales hardcodeadas; toda la lógica vive en el prompt.
     """
-    # Llamar a OpenAI para generar la respuesta conversacional (si la API está disponible)
-    if client:
-        try:
-            # Obtener propiedades filtradas para pasarle a la IA
-            available_properties = get_filtered_properties(lead_data)
-            print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
-            if available_properties:
-                print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
-            
-            # Contar cuántas veces se ha preguntado por más detalles (aproximación por historial)
-            property_detail_requests = 0
-            for msg in conversation_history[-6:]:  # Últimos 6 mensajes
-                if msg.get("role") == "assistant" and any(word in msg.get("content", "").lower() for word in ["detalles", "link", "dirección", "código"]):
-                    property_detail_requests += 1
-            
-            print(f"[DEBUG] Intentos de obtener detalles: {property_detail_requests}")
-            
-            # Construir contexto de propiedades disponibles
-            property_info = ""
-            if available_properties:
-                property_info = f"\n🏠 PROPIEDADES DISPONIBLES ({len(available_properties)}):\n"
-                for i, prop in enumerate(available_properties[:10], 1):  # Máximo 10 para no saturar
-                    title = prop.get("Title", "Sin título")
-                    neighborhood = prop.get("Neighborhood", "")
-                    rooms = prop.get("Rooms", "")
-                    price = prop.get("Price", "")
-                    
-                    property_info += f"{i}. {title}"
-                    if neighborhood:
-                        property_info += f" - {neighborhood}"
-                    if rooms:
-                        property_info += f" - {rooms} amb"
-                    if price:
-                        try:
-                            price_val = float(price)
-                            if price_val >= 1000000:
-                                price_str = f"${price_val/1000000:.1f}M"
-                            elif price_val >= 1000:
-                                price_str = f"${int(price_val/1000)}k"
-                            else:
-                                price_str = f"${int(price_val)}"
-                            property_info += f" - {price_str}"
-                        except:
-                            pass
-                    property_info += "\n"
+    if not client:
+        print("❌ ERROR: Cliente OpenAI no disponible")
+        return None
+    
+    try:
+        # Obtener propiedades filtradas para pasarle a la IA
+        available_properties = get_filtered_properties(lead_data)
+        print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
+        if available_properties:
+            print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
+        
+        # Contar cuántas veces se ha preguntado por más detalles
+        property_detail_requests = 0
+        for msg in conversation_history[-6:]:
+            if msg.get("role") == "assistant" and any(word in msg.get("content", "").lower() for word in ["detalles", "link", "título"]):
+                property_detail_requests += 1
+        
+        print(f"[DEBUG] Intentos de obtener detalles: {property_detail_requests}")
+        
+        # Construir información sobre datos faltantes para visita
+        missing_data = []
+        
+        # 1) Propiedad específica
+        if not available_properties or len(available_properties) != 1:
+            missing_data.append("propiedad específica identificada")
+        
+        # 2) Para quién es la compra
+        buyer_confirmed = False
+        for msg in conversation_history[-10:]:
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["para mi", "para mí", "es mío", "es para mi hijo", "puedo decidir"]):
+                buyer_confirmed = True
+                break
+        if not buyer_confirmed:
+            missing_data.append("confirmar para quién es")
+        
+        # 3) Motivo de búsqueda
+        motive_confirmed = False
+        for msg in conversation_history[-10:]:
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["mudanza", "mudarme", "inversión", "invertir"]):
+                motive_confirmed = True
+                break
+        if not motive_confirmed:
+            missing_data.append("motivo de búsqueda")
+        
+        # 4) Capacidad económica
+        financing_confirmed = False
+        for msg in conversation_history[-10:]:
+            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["ahorro", "crédito", "efectivo", "financio", "banco"]):
+                financing_confirmed = True
+                break
+        if not lead_data.get("Budget") and not financing_confirmed:
+            missing_data.append("capacidad económica")
+        
+        missing_info = ""
+        if missing_data:
+            missing_info = f"\n📋 DATOS FALTANTES para agendar visita: {', '.join(missing_data)}"
+        
+        # Construir contexto de propiedades
+        property_info = missing_info
+        
+        if available_properties:
+            property_info += f"\n🏠 PROPIEDADES DISPONIBLES ({len(available_properties)}):\n"
+            for i, prop in enumerate(available_properties[:10], 1):
+                title = prop.get("Title", "Sin título")
+                neighborhood = prop.get("Neighborhood", "")
+                rooms = prop.get("Rooms", "")
+                price = prop.get("Price", "")
                 
-                # Determinar si es primer mensaje o conversación en curso
-                is_first_message = len(conversation_history) <= 1
-                greeting = "Hola! " if is_first_message else ""
-                
-                if len(available_properties) == 1:
-                    property_info += "\n✅ UNA SOLA PROPIEDAD encontrada. Continúa con precalificación."
-                    property_info += f"\nRespuesta: '{greeting}Es para vos o para alguien más?'"
-                else:
-                    property_info += "\nCRÍTICO: Hay MÚLTIPLES propiedades. DEBES identificar cuál específicamente busca el cliente."
-                    property_info += f"\nRespuesta: '{greeting}Tengo varias propiedades en {lead_data.get('Neighborhood', 'esa zona')}. Cuál te interesa? Me podés dar el título o algún detalle específico?'"
-                    property_info += "\nNO continúes con precalificación hasta saber la propiedad exacta."
-            else:
-                # No hay propiedades que coincidan con los filtros
-                neighborhood = lead_data.get("Neighborhood")
+                property_info += f"{i}. {title}"
                 if neighborhood:
-                    # Si ya se pidieron detalles 3+ veces, ofrecer alternativas o cerrar
-                    if property_detail_requests >= 3:
-                        fallback_properties = get_fallback_properties(lead_data)
-                        if fallback_properties:
-                            property_info = f"\n🔄 FALLBACK: Después de {property_detail_requests} intentos, ofrecer alternativas."
-                            property_info += f"\n🏠 PROPIEDADES ALTERNATIVAS ({len(fallback_properties)}):\n"
-                            for i, prop in enumerate(fallback_properties[:5], 1):
-                                title = prop.get("Title", "Sin título")
-                                prop_neighborhood = prop.get("Neighborhood", "")
-                                rooms = prop.get("Rooms", "")
-                                price = prop.get("Price", "")
-                                
-                                property_info += f"{i}. {title}"
-                                if prop_neighborhood:
-                                    property_info += f" - {prop_neighborhood}"
-                                if rooms:
-                                    property_info += f" - {rooms} amb"
-                                if price:
-                                    try:
-                                        price_val = float(price)
-                                        if price_val >= 1000000:
-                                            price_str = f"${price_val/1000000:.1f}M"
-                                        elif price_val >= 1000:
-                                            price_str = f"${int(price_val/1000)}k"
-                                        else:
-                                            price_str = f"${int(price_val)}"
-                                        property_info += f" - {price_str}"
-                                    except:
-                                        pass
-                                property_info += "\n"
-                            property_info += f"\nRespuesta: 'No tenemos esa propiedad específica en {neighborhood}. Te muestro opciones similares que tenemos disponibles:' y luego lista las propiedades."
+                    property_info += f" - {neighborhood}"
+                if rooms:
+                    property_info += f" - {rooms} amb"
+                if price:
+                    try:
+                        price_val = float(price)
+                        if price_val >= 1000000:
+                            price_str = f"${price_val/1000000:.1f}M"
+                        elif price_val >= 1000:
+                            price_str = f"${int(price_val/1000)}k"
                         else:
-                            # No hay alternativas O no hay suficientes criterios - cerrar conversación
-                            property_info = f"\n❌ CERRAR CONVERSACIÓN: Después de {property_detail_requests} intentos sin éxito."
-                            property_info += f"\nRespuesta: 'Lamentablemente no tenemos propiedades que coincidan con lo que buscás.'"
+                            price_str = f"${int(price_val)}"
+                        property_info += f" - {price_str}"
+                    except:
+                        pass
+                property_info += "\n"
+            
+            # Determinar respuesta según cantidad de propiedades
+            is_first_message = len(conversation_history) <= 1
+            greeting = "Hola! " if is_first_message else ""
+            
+            if len(available_properties) == 1:
+                property_info += "\n✅ UNA SOLA PROPIEDAD encontrada. Continúa con precalificación."
+                property_info += f"\nRespuesta: '{greeting}Es para vos o para alguien más?'"
+            else:
+                property_info += "\nCRÍTICO: Hay MÚLTIPLES propiedades. DEBES identificar cuál específicamente busca el cliente."
+                neighborhood = lead_data.get('Neighborhood', 'esa zona')
+                property_info += f"\nRespuesta: '{greeting}Tengo varias propiedades en {neighborhood}. Cuál te interesa? Me podés dar el título o algún detalle específico?'"
+                property_info += "\nNO continúes con precalificación hasta saber la propiedad exacta."
+        else:
+            # No hay propiedades que coincidan
+            neighborhood = lead_data.get("Neighborhood")
+            if neighborhood:
+                if property_detail_requests >= 3:
+                    # Después de 3+ intentos
+                    fallback_properties = get_fallback_properties(lead_data)
+                    if fallback_properties:
+                        property_info += f"\n🔄 FALLBACK: Después de {property_detail_requests} intentos, ofrecer alternativas."
+                        property_info += f"\n🏠 PROPIEDADES ALTERNATIVAS ({len(fallback_properties)}):\n"
+                        for i, prop in enumerate(fallback_properties[:5], 1):
+                            title = prop.get("Title", "Sin título")
+                            prop_neighborhood = prop.get("Neighborhood", "")
+                            rooms = prop.get("Rooms", "")
+                            price = prop.get("Price", "")
+                            
+                            property_info += f"{i}. {title}"
+                            if prop_neighborhood:
+                                property_info += f" - {prop_neighborhood}"
+                            if rooms:
+                                property_info += f" - {rooms} amb"
+                            if price:
+                                try:
+                                    price_val = float(price)
+                                    if price_val >= 1000000:
+                                        price_str = f"${price_val/1000000:.1f}M"
+                                    elif price_val >= 1000:
+                                        price_str = f"${int(price_val/1000)}k"
+                                    else:
+                                        price_str = f"${int(price_val)}"
+                                    property_info += f" - {price_str}"
+                                except:
+                                    pass
+                            property_info += "\n"
+                        property_info += f"\nRespuesta: 'No tenemos esa propiedad específica en {neighborhood}. Te muestro opciones similares:' y luego lista las propiedades."
                     else:
-                        # Primer o segundo intento - seguir pidiendo detalles
-                        property_info = f"\n❌ LISTA VACÍA: NO HAY PROPIEDADES en {neighborhood}."
-                        property_info += f"\n🚨 RESPUESTA OBLIGATORIA: 'No tengo propiedades disponibles en {neighborhood}. Me podés dar más detalles? Título completo o link?'"
-                        property_info += f"\n🚫 PROHIBIDO: NO hagas preguntas de precalificación como 'Es para vos o para alguien más?' cuando la lista está vacía."
-                        property_info += f"\n🚫 PROHIBIDO: NO pidas 'dirección exacta' o 'código' (no existen en la base de datos)."
-                        property_info += f"\n✅ SOLO pedí: título completo o link (campos que SÍ existen)."
+                        property_info += f"\n❌ CERRAR: Después de {property_detail_requests} intentos sin éxito."
+                        property_info += f"\nRespuesta: 'Lamentablemente no tenemos propiedades que coincidan con lo que buscás.'"
                 else:
-                    property_info = "\n📋 NO HAY CRITERIOS ESPECÍFICOS aún. Necesitas más información del cliente."
+                    # Primeros intentos - pedir más detalles
+                    property_info += f"\n❌ NO HAY PROPIEDADES en {neighborhood}."
+                    property_info += f"\nRespuesta: 'No tengo propiedades disponibles en {neighborhood}. Me podés dar más detalles? Título completo o link?'"
+            else:
+                property_info += "\n📋 NO HAY CRITERIOS ESPECÍFICOS. Necesitas más información del cliente."
 
-            # Preparar mensajes: prompt de sistema + historial completo (reciente)
-            full_system_prompt = AGENT_SYSTEM_PROMPT + property_info
-            print(f"[DEBUG] System prompt length: {len(full_system_prompt)}")
-            print(f"[DEBUG] Property info: {property_info[:200]}...")
-            messages = [{"role": "system", "content": full_system_prompt}]
-            
-            # Agregar recordatorio de reglas antes del historial
-            if len(conversation_history) > 0:
-                reminder_content = "RECORDATORIO: NUNCA uses signos de pregunta invertidos (¿) ni emojis. Escribe siempre sin ¿ y sin emojis."
-                if not available_properties and lead_data.get("Neighborhood"):
-                    reminder_content += f" CRÍTICO: NO hay propiedades en {lead_data.get('Neighborhood')}. DEBES pedir más detalles, NO continúes con precalificación."
-                messages.append({
-                    "role": "system", 
-                    "content": reminder_content
-                })
-            
-            # Limitar a últimos 20 mensajes para contexto suficiente
-            for msg in conversation_history[-20:]:
+        # Preparar mensajes para OpenAI
+        full_system_prompt = AGENT_SYSTEM_PROMPT + property_info
+        print(f"[DEBUG] System prompt length: {len(full_system_prompt)}")
+        print(f"[DEBUG] Property info: {property_info[:200]}...")
+        
+        messages = [{"role": "system", "content": full_system_prompt}]
+        
+        # Agregar recordatorio
+        if len(conversation_history) > 0:
+            reminder = "RECORDATORIO: NUNCA uses signos de pregunta invertidos (¿) ni emojis."
+            if not available_properties and lead_data.get("Neighborhood"):
+                reminder += f" CRÍTICO: NO hay propiedades en {lead_data.get('Neighborhood')}. DEBES pedir más detalles."
+            messages.append({"role": "system", "content": reminder})
+        
+        # Agregar historial completo
+        for msg in conversation_history:
                 messages.append(msg)
-            
-            print(f"[DEBUG] Enviando {len(messages)} mensajes a OpenAI")
-            print(f"[DEBUG] Último mensaje del usuario: {conversation_history[-1].get('content', '') if conversation_history else 'N/A'}")
-            
-            # Debug: Mostrar mensajes que se envían a la API
-            print("[DEBUG] === MENSAJES ENVIADOS A API ===")
-            for i, msg in enumerate(messages):
-                role = msg.get("role", "unknown")
-                content = msg.get("content", "")
-                print(f"[DEBUG] {i+1}. {role.upper()}: {content[:100]}...")
-            print("[DEBUG] === FIN MENSAJES ===")
 
+        print(f"[DEBUG] Enviando {len(messages)} mensajes a OpenAI")
+        
+        # Llamar a OpenAI con debug detallado
+        try:
             response = client.chat.completions.create(
                 model=OPENAI_MODEL,
-                messages=messages,
-                max_completion_tokens=1000
+                messages=messages
             )
             
-            print(f"[DEBUG] Respuesta recibida de OpenAI: '{response.choices[0].message.content}'")
+            if not response.choices:
+                print("❌ ERROR: Response sin choices")
+                return None
             
             result = response.choices[0].message.content
-            if result is None:
-                print("[AI][ERROR] API retornó contenido None")
-                return None
-            
-            result = result.strip()
             if not result:
-                print("[AI][ERROR] API retornó contenido vacío")
+                print("❌ ERROR: API retornó contenido vacío")
+                print(f"❌ FINISH REASON: {getattr(response.choices[0], 'finish_reason', 'N/A')}")
+                print(f"❌ USAGE: {getattr(response, 'usage', 'N/A')}")
+                # Guardar prompt para debug
+                with open("/tmp/failed_prompt.txt", "w", encoding="utf-8") as f:
+                    f.write(f"MODELO: {OPENAI_MODEL}\n")
+                    f.write(f"FINISH_REASON: {getattr(response.choices[0], 'finish_reason', 'N/A')}\n\n")
+                    for i, msg in enumerate(messages):
+                        f.write(f"=== MENSAJE {i+1} ({msg.get('role', 'unknown').upper()}) ===\n")
+                        f.write(f"{msg.get('content', '')}\n\n")
+                print("❌ Prompt guardado en /tmp/failed_prompt.txt")
                 return None
             
-            # Separar múltiples preguntas en mensajes individuales
-            if "?" in result and result.count("?") > 1:
-                # Dividir por preguntas y limpiar
-                parts = result.split("?")
-                messages = []
-                for part in parts:
-                    part = part.strip()
-                    if part and not part.endswith("."):
-                        messages.append(part + "?")
-                    elif part:
-                        messages.append(part)
-                
-                # Si hay múltiples mensajes, devolver solo el primero
-                # El webhook se encargará de enviar los siguientes
-                if len(messages) > 1:
-                    # Guardar los mensajes restantes en el lead para enviarlos después
-                    # Devolver el primer mensaje como string normal
-                    return messages[0]
+            return result.strip()
             
-            return result
-        except Exception as e:
-            print(f"[AGENT_RESPONSE][ERROR] {e}")
+        except Exception as api_error:
+            print(f"❌ ERROR: Excepción en API call")
+            print(f"❌ TIPO: {type(api_error).__name__}")
+            print(f"❌ MENSAJE: {str(api_error)}")
+            import traceback
+            print(f"❌ STACK TRACE: {traceback.format_exc()}")
             return None
-
-    # Si no hay cliente disponible, no responder nada
-    return None
+            
+    except Exception as e:
+        print(f"❌ ERROR: Excepción general en generate_agent_response")
+        print(f"❌ TIPO: {type(e).__name__}")
+        print(f"❌ MENSAJE: {str(e)}")
+        import traceback
+        print(f"❌ STACK TRACE: {traceback.format_exc()}")
+        return None
 
 

@@ -20,7 +20,7 @@ def main():
 
     
     phone_number = '4'
-    message = 'es mi hijo igual asique puedo decidir por el'
+    message = 'si me gusta quiero comprar cuanto antes '
     
     print(f"📱 Número: {phone_number}")
     print(f"💬 Mensaje: {message}")
