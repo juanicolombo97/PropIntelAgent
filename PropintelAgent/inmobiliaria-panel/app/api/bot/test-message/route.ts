@@ -65,27 +65,52 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
       if (response.ok) {
         const xmlText = await response.text();
         
-        // Extraer el mensaje de la respuesta XML
-        const messageMatch = xmlText.match(/<Message>([\s\S]*?)<\/Message>/);
-        const reply = messageMatch ? messageMatch[1].trim() : 'Disculpa, tuve un problema técnico. Podés intentar de nuevo en un momento?';
-        
-        // Obtener información del lead desde la base de datos
-        const leadResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/lead?lead_id=${phoneNumber}`, {
-          method: 'GET',
-          headers: {
-            'x-api-key': API_CONFIG.ADMIN_API_KEY,
+        // El bot real responde con un ACK vacío inmediatamente
+        // La respuesta real llegará después de 3 minutos via polling
+        if (xmlText.includes('<Response></Response>') || xmlText.includes('<Message></Message>')) {
+          // El bot recibió el mensaje correctamente, pero la respuesta llegará en 3 minutos
+          console.log('✅ Bot real recibió el mensaje, respuesta llegará en ~3 minutos');
+          
+          // Obtener información del lead desde la base de datos
+          const leadResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/lead?lead_id=${phoneNumber}`, {
+            method: 'GET',
+            headers: {
+              'x-api-key': API_CONFIG.ADMIN_API_KEY,
+            }
+          });
+          
+          let leadInfo = { LeadId: phoneNumber, Status: 'NUEVO' };
+          if (leadResponse.ok) {
+            leadInfo = await leadResponse.json();
           }
-        });
-        
-        let leadInfo = { LeadId: phoneNumber, Status: 'NEW' };
-        if (leadResponse.ok) {
-          leadInfo = await leadResponse.json();
+          
+          return {
+            reply: '✅ Mensaje enviado al bot real. La respuesta llegará en aproximadamente 3 minutos...',
+            leadInfo
+          };
+        } else {
+          // Extraer el mensaje de la respuesta XML si hay contenido
+          const messageMatch = xmlText.match(/<Message>([\s\S]*?)<\/Message>/);
+          const reply = messageMatch ? messageMatch[1].trim() : 'Disculpa, tuve un problema técnico. Podés intentar de nuevo en un momento?';
+          
+          // Obtener información del lead desde la base de datos
+          const leadResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/lead?lead_id=${phoneNumber}`, {
+            method: 'GET',
+            headers: {
+              'x-api-key': API_CONFIG.ADMIN_API_KEY,
+            }
+          });
+          
+          let leadInfo = { LeadId: phoneNumber, Status: 'NUEVO' };
+          if (leadResponse.ok) {
+            leadInfo = await leadResponse.json();
+          }
+          
+          return {
+            reply,
+            leadInfo
+          };
         }
-        
-        return {
-          reply,
-          leadInfo
-        };
       }
     } catch (error) {
       console.log('Bot real no disponible, usando simulación:', error instanceof Error ? error.message : String(error));

@@ -90,7 +90,7 @@ export default function BotSimulatorPage() {
 
   // Polling para verificar mensajes nuevos del bot
   useEffect(() => {
-    if (!phoneNumber || isLoading) return;
+    if (!phoneNumber) return;
 
     const pollForNewMessages = async () => {
       try {
@@ -120,11 +120,12 @@ export default function BotSimulatorPage() {
       }
     };
 
-    // Polling cada 2 segundos cuando hay una conversación activa
-    const interval = setInterval(pollForNewMessages, 2000);
+    // Polling cada 5 segundos cuando hay una conversación activa
+    // (más frecuente para detectar respuestas del bot real que tarda 3 minutos)
+    const interval = setInterval(pollForNewMessages, 5000);
     
     return () => clearInterval(interval);
-  }, [phoneNumber, messages.length, leadInfo, isLoading]);
+  }, [phoneNumber, messages.length, leadInfo]);
 
   // Efecto para limpiar conversación cuando cambia el número de teléfono
   useEffect(() => {
@@ -430,6 +431,22 @@ export default function BotSimulatorPage() {
                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                           </div>
                           <span className="text-xs text-slate-500">Gonzalo está escribiendo...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Indicador de espera del bot real */}
+                  {messages.some(msg => msg.content.includes('Mensaje enviado al bot real')) && (
+                    <div className="flex justify-start mb-3">
+                      <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 shadow-sm rounded-bl-md">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                          </div>
+                          <span className="text-xs text-blue-600">Esperando respuesta del bot real (~3 min)...</span>
                         </div>
                       </div>
                     </div>
