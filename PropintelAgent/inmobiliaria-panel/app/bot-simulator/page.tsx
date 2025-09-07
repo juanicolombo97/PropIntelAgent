@@ -50,7 +50,7 @@ export default function BotSimulatorPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isPolling, setIsPolling] = useState(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
-  const [waitingForBotResponse, setWaitingForBotResponse] = useState(false);
+  // const [waitingForBotResponse, setWaitingForBotResponse] = useState(false); // Removed - no longer needed
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const showLoading = (message: string) => {
@@ -102,7 +102,7 @@ export default function BotSimulatorPage() {
     const pollForNewMessages = async () => {
       try {
         setIsPolling(true);
-        console.log('🔄 Polling para mensajes nuevos...', phoneNumber);
+        console.log('🔄 Polling para mensajes nuevos...', phoneNumber, 'Timestamp:', new Date().toLocaleTimeString());
         const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
         if (response.ok) {
           const data = await response.json();
@@ -112,7 +112,7 @@ export default function BotSimulatorPage() {
             historyLength: currentHistoryLength, 
             lastMessageCount,
             hasNewMessages: currentHistoryLength > lastMessageCount,
-            waitingForBot: waitingForBotResponse,
+            // waitingForBot: waitingForBotResponse, // Removed
             isBotTyping: isBotTyping
           });
           
@@ -172,30 +172,14 @@ export default function BotSimulatorPage() {
             setLastMessageCount(currentHistoryLength);
           }
           
-          // Verificar estado de indicadores basado en mensajes pendientes
-          // (esto se ejecuta en cada polling, independientemente de si hay mensajes nuevos)
-          console.log('⏳ Verificando estado de indicadores:', {
-            hasPendingMessages: data.hasPendingMessages,
-            waitingForBotResponse,
-            isBotTyping
-          });
-          
-          // Si hay mensajes pendientes, mantener indicadores
-          if (data.hasPendingMessages) {
-            console.log('⏳ Hay mensajes pendientes, manteniendo indicadores');
-            // No hacer nada, mantener el estado actual
-          } else {
-            // Si no hay mensajes pendientes, verificar si el último mensaje es del bot
-            const lastMessage = data.history[data.history.length - 1];
-            const isLastMessageFromBot = lastMessage && lastMessage.role === 'assistant';
+          // Solo quitar "Gonzalo está escribiendo" si hay mensajes nuevos del bot
+          if (currentHistoryLength > lastMessageCount) {
+            const newMessages = data.history.slice(lastMessageCount);
+            const hasNewBotMessages = newMessages.some(msg => msg.role === 'assistant');
             
-            if (isLastMessageFromBot && waitingForBotResponse) {
-              console.log('✅ No hay mensajes pendientes y último mensaje es del bot, quitando indicadores');
-              setWaitingForBotResponse(false);
+            if (hasNewBotMessages) {
+              console.log('✅ Hay mensajes nuevos del bot, quitando "Gonzalo está escribiendo"');
               setIsBotTyping(false);
-            } else if (!isLastMessageFromBot && waitingForBotResponse) {
-              console.log('⏳ No hay mensajes pendientes pero último mensaje es del usuario, manteniendo indicadores');
-              // Mantener indicadores
             }
           }
         }
@@ -209,7 +193,7 @@ export default function BotSimulatorPage() {
     // Polling cada 60 segundos (1 minuto) para detectar respuestas del bot real
     intervalId = setInterval(pollForNewMessages, 60000);
     
-    console.log('🔄 Polling iniciado cada 60 segundos para:', phoneNumber);
+    console.log('🔄 Polling iniciado cada 60 segundos para:', phoneNumber, 'Interval ID:', intervalId);
     
     // Ejecutar inmediatamente al montar
     pollForNewMessages();
@@ -231,7 +215,7 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setCurrentMessage('');
       setLastMessageCount(0);
-      setWaitingForBotResponse(false);
+      // setWaitingForBotResponse(false); // Removed
       setIsBotTyping(false);
       
       // Mostrar notificación
@@ -298,8 +282,8 @@ export default function BotSimulatorPage() {
         setIsBotTyping(false); // El bot ya respondió
       } else {
         // Si no hay respuesta, significa que se envió al bot real
-        setWaitingForBotResponse(true);
-        // Mantener "Gonzalo está escribiendo" hasta que llegue la respuesta del bot real
+        // No mostrar indicador de espera, solo mantener "Gonzalo está escribiendo"
+        // setWaitingForBotResponse(true); // Comentado - no mostrar indicador
       }
         
       // Actualizar información del lead
@@ -334,7 +318,7 @@ export default function BotSimulatorPage() {
       setMessages([]);
       setLeadInfo(null);
       setLastMessageCount(0);
-      setWaitingForBotResponse(false);
+      // setWaitingForBotResponse(false); // Removed
       setIsBotTyping(false);
     } catch (error) {
       console.error('Error al limpiar conversación:', error);
@@ -342,7 +326,7 @@ export default function BotSimulatorPage() {
       setMessages([]);
       setLeadInfo(null);
       setLastMessageCount(0);
-      setWaitingForBotResponse(false);
+      // setWaitingForBotResponse(false); // Removed
       setIsBotTyping(false);
     }
   };
@@ -556,7 +540,7 @@ export default function BotSimulatorPage() {
                   ))}
                   
                   {/* Indicador de que el bot está escribiendo */}
-                  {isBotTyping && !waitingForBotResponse && (
+                  {isBotTyping && (
                     <div className="flex justify-start mb-3">
                       <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md">
                         <div className="flex items-center space-x-2">
@@ -571,24 +555,6 @@ export default function BotSimulatorPage() {
                     </div>
                   )}
 
-                  {/* Indicador de espera del bot real */}
-                  {waitingForBotResponse && (
-                    <div className="flex justify-start mb-3">
-                      <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-900 shadow-sm rounded-bl-md">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-blue-700">Esperando respuesta del bot real</span>
-                            <span className="text-xs text-blue-500">La respuesta llegará en aproximadamente 3 minutos...</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
               <div ref={messagesEndRef} />
