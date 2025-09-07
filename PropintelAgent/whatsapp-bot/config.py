@@ -1,8 +1,6 @@
 import os
-from dotenv import load_dotenv
 
-# Cargar variables de entorno desde .env
-load_dotenv()
+# En Lambda, las variables ya están en el entorno - no usar dotenv
 
 # Tablas DynamoDB
 LEADS_TABLE = os.getenv("LEADS_TABLE", "Leads")

@@ -240,13 +240,38 @@ create_lambda_function() {
     
     # Configurar variables de entorno
     echo "  → Configurando variables de entorno..."
+    
+    # Leer variables de OpenAI del .env local si existe
+    OPENAI_API_KEY=""
+    OPENAI_MODEL="gpt-4o-mini"
+    
+    if [ -f "../whatsapp-bot/.env" ]; then
+        echo "  → Leyendo configuración OpenAI desde .env..."
+        OPENAI_API_KEY=$(grep "OPENAI_API_KEY=" ../whatsapp-bot/.env | cut -d '=' -f2 | tr -d '"')
+        OPENAI_MODEL_FROM_ENV=$(grep "OPENAI_MODEL=" ../whatsapp-bot/.env | cut -d '=' -f2 | tr -d '"')
+        if [ ! -z "$OPENAI_MODEL_FROM_ENV" ]; then
+            OPENAI_MODEL="$OPENAI_MODEL_FROM_ENV"
+        fi
+    fi
+    
+    if [ -z "$OPENAI_API_KEY" ]; then
+        echo "  ⚠️ OPENAI_API_KEY no encontrada en .env"
+        echo "     Deberás configurarla manualmente en Lambda"
+    fi
+    
     aws lambda update-function-configuration \
         --function-name whatsapp-bot-api \
         --environment Variables="{
             \"ADMIN_USERNAME\":\"admin\",
             \"ADMIN_PASSWORD\":\"$ADMIN_PASSWORD\",
             \"ADMIN_EMAIL\":\"admin@propintel.com\",
-            \"ADMIN_API_KEY\":\"$ADMIN_API_KEY\"
+            \"ADMIN_API_KEY\":\"$ADMIN_API_KEY\",
+            \"OPENAI_API_KEY\":\"$OPENAI_API_KEY\",
+            \"OPENAI_MODEL\":\"$OPENAI_MODEL\",
+            \"LEADS_TABLE\":\"Leads\",
+            \"MESSAGES_TABLE\":\"Messages\",
+            \"PROPERTIES_TABLE\":\"Properties\",
+            \"VISITS_TABLE\":\"Visits\"
         }" > /dev/null
     
     echo "  ✅ Función Lambda configurada"
