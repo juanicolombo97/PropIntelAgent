@@ -78,7 +78,7 @@ export default function Dashboard() {
   // Métricas de eficiencia
   const performanceStats = {
     avgResponseTime: Math.floor(Math.random() * 24) + 2, // Horas
-    leadQualificationRate: Math.round((leads.filter((l: any) => l.Status === 'QUALIFIED').length / leads.length) * 100) || 0,
+    leadQualificationRate: Math.round((leads.filter((l: any) => l.Status === 'CALIFICADO').length / leads.length) * 100) || 0,
     visitConfirmationRate: visits.length > 0 ? Math.round((visits.filter((v: any) => v.Confirmed).length / visits.length) * 100) : 0,
     avgDaysToClose: Math.floor(Math.random() * 45) + 30 // Días
   };
@@ -197,7 +197,7 @@ export default function Dashboard() {
                       {lead.Intent || 'Sin intención'} • {lead.Neighborhood || 'Sin barrio'}
                     </p>
                   </div>
-                  <Badge variant={lead.Status === 'NEW' ? 'warning' : 'success'} size="sm">
+                  <Badge variant={lead.Status === 'NUEVO' ? 'warning' : 'success'} size="sm">
                     {lead.Status}
                   </Badge>
                 </div>

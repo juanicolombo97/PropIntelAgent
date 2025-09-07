@@ -128,7 +128,7 @@ export function PropertyDetailModal({ isOpen, onClose, property }: PropertyDetai
           // Cargar leads sugeridos basados en datos reales
           // Solo sugerir leads que no han visitado esta propiedad
           try {
-            const allLeadsResponse = await Admin.leadsByStatus('QUALIFIED');
+            const allLeadsResponse = await Admin.leadsByStatus('CALIFICADO');
             const allLeads = allLeadsResponse.items || [];
             
             const suggestedLeads = allLeads

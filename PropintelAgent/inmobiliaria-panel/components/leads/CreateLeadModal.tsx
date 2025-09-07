@@ -22,7 +22,7 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
     Neighborhood: '',
     Rooms: '',
     Budget: '',
-    Stage: 'NEW',
+        Stage: 'PRECALIFICACION',
     Notes: ''
   });
 
@@ -242,9 +242,9 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="NEW">Nuevo</option>
+                  <option value="NUEVO">Nuevo</option>
                   <option value="CONTACTED">Contactado</option>
-                  <option value="QUALIFIED">Calificado</option>
+                  <option value="CALIFICADO">Calificado</option>
                   <option value="VISIT_SCHEDULED">Visita Programada</option>
                 </select>
               </div>

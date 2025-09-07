@@ -20,8 +20,8 @@ export default function StatsPage() {
         setLoading(true);
         
         const [newLeads, qualifiedLeads, properties] = await Promise.all([
-          Admin.leadsByStatus('NEW'),
-          Admin.leadsByStatus('QUALIFIED'),
+          Admin.leadsByStatus('NUEVO'),
+          Admin.leadsByStatus('CALIFICADO'),
           Admin.properties()
         ]);
 
@@ -193,7 +193,7 @@ export default function StatsPage() {
           <Users size={24} className="mx-auto mb-2 text-purple-600" />
           <p className="text-sm font-medium text-slate-600">Leads Calificados</p>
           <p className="text-3xl font-bold text-slate-900">
-            {realData.leads.filter(l => l.Status === 'QUALIFIED').length}
+            {realData.leads.filter(l => l.Status === 'CALIFICADO').length}
           </p>
           <div className="flex items-center justify-center gap-1 mt-1">
             <span className="text-xs text-purple-600">de {realData.leads.length} total</span>
