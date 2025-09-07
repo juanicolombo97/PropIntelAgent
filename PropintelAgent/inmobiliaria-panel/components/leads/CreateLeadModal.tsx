@@ -47,8 +47,8 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
         Neighborhood: formData.Neighborhood || undefined,
         Rooms: formData.Rooms ? parseInt(formData.Rooms) : undefined,
         Budget: formData.Budget ? parseInt(formData.Budget) : undefined,
-        Status: 'NEW',
-        Stage: formData.Stage || 'NEW',
+    Status: 'NUEVO',
+    Stage: formData.Stage || 'PRECALIFICACION',
         Notes: formData.Notes || undefined,
         CreatedAt: new Date().toISOString(),
         UpdatedAt: new Date().toISOString()
@@ -65,7 +65,7 @@ export function CreateLeadModal({ isOpen, onClose, onLeadCreated }: CreateLeadMo
         Neighborhood: '',
         Rooms: '',
         Budget: '',
-        Stage: 'NEW',
+        Stage: 'PRECALIFICACION',
         Notes: ''
       });
       

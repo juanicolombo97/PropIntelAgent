@@ -17,7 +17,7 @@ export default function LeadsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'NEW' | 'QUALIFIED'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'NUEVO' | 'CALIFICANDO' | 'CALIFICADO' | 'AGENDANDO_VISITA' | 'PROCESO_COMPLETADO'>('all');
 
   // Los datos se cargan automáticamente al inicializar la aplicación
   // No necesitamos cargar datos aquí
@@ -39,8 +39,11 @@ export default function LeadsPage() {
   // Estadísticas
   const stats = {
     total: leads.length,
-    new: leads.filter(lead => lead.Status === 'NEW').length,
-    qualified: leads.filter(lead => lead.Status === 'QUALIFIED').length,
+    nuevo: leads.filter(lead => lead.Status === 'NUEVO').length,
+    calificando: leads.filter(lead => lead.Status === 'CALIFICANDO').length,
+    calificado: leads.filter(lead => lead.Status === 'CALIFICADO').length,
+    agendando: leads.filter(lead => lead.Status === 'AGENDANDO_VISITA').length,
+    completado: leads.filter(lead => lead.Status === 'PROCESO_COMPLETADO').length,
     avgBudget: leads.length > 0 
       ? Math.round(leads.reduce((sum, lead) => sum + (lead.Budget || 0), 0) / leads.length)
       : 0
@@ -85,7 +88,7 @@ export default function LeadsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600">Nuevos</p>
-              <p className="text-2xl font-bold text-slate-900">{stats.new}</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.nuevo}</p>
             </div>
             <div className="p-2 bg-yellow-100 rounded-lg">
               <TrendingUp size={20} className="text-yellow-600" />
@@ -97,7 +100,7 @@ export default function LeadsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-600">Calificados</p>
-              <p className="text-2xl font-bold text-slate-900">{stats.qualified}</p>
+              <p className="text-2xl font-bold text-slate-900">{stats.calificado}</p>
             </div>
             <div className="p-2 bg-green-100 rounded-lg">
               <User size={20} className="text-green-600" />
@@ -136,18 +139,25 @@ export default function LeadsPage() {
               Todos ({leads.length})
             </Button>
             <Button
-              variant={filterStatus === 'NEW' ? 'primary' : 'secondary'}
+              variant={filterStatus === 'NUEVO' ? 'primary' : 'secondary'}
               size="sm"
-              onClick={() => setFilterStatus('NEW')}
+              onClick={() => setFilterStatus('NUEVO')}
             >
-              Nuevos ({stats.new})
+              Nuevos ({stats.nuevo})
             </Button>
             <Button
-              variant={filterStatus === 'QUALIFIED' ? 'primary' : 'secondary'}
+              variant={filterStatus === 'CALIFICANDO' ? 'primary' : 'secondary'}
               size="sm"
-              onClick={() => setFilterStatus('QUALIFIED')}
+              onClick={() => setFilterStatus('CALIFICANDO')}
             >
-              Calificados ({stats.qualified})
+              Calificando ({stats.calificando})
+            </Button>
+            <Button
+              variant={filterStatus === 'CALIFICADO' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setFilterStatus('CALIFICADO')}
+            >
+              Calificados ({stats.calificado})
             </Button>
           </div>
         </div>
@@ -158,14 +168,32 @@ export default function LeadsPage() {
         {filterStatus === 'all' && (
           <>
             <LeadsTable
-              leads={leads.filter(lead => lead.Status === 'NEW')}
+              leads={leads.filter(lead => lead.Status === 'NUEVO')}
               title="Leads Nuevos"
               onLeadClick={handleLeadClick}
             />
             
             <LeadsTable
-              leads={leads.filter(lead => lead.Status === 'QUALIFIED')}
+              leads={leads.filter(lead => lead.Status === 'CALIFICANDO')}
+              title="Leads Calificando"
+              onLeadClick={handleLeadClick}
+            />
+            
+            <LeadsTable
+              leads={leads.filter(lead => lead.Status === 'CALIFICADO')}
               title="Leads Calificados"
+              onLeadClick={handleLeadClick}
+            />
+            
+            <LeadsTable
+              leads={leads.filter(lead => lead.Status === 'AGENDANDO_VISITA')}
+              title="Agendando Visitas"
+              onLeadClick={handleLeadClick}
+            />
+            
+            <LeadsTable
+              leads={leads.filter(lead => lead.Status === 'PROCESO_COMPLETADO')}
+              title="Proceso Completado"
               onLeadClick={handleLeadClick}
             />
           </>
@@ -174,7 +202,7 @@ export default function LeadsPage() {
         {filterStatus !== 'all' && (
           <LeadsTable
             leads={filteredLeads}
-            title={`Leads ${filterStatus === 'NEW' ? 'Nuevos' : 'Calificados'}`}
+            title={`Leads ${filterStatus}`}
             onLeadClick={handleLeadClick}
           />
         )}

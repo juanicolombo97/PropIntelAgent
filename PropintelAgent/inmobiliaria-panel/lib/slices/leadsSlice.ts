@@ -20,26 +20,31 @@ const initialState: LeadsState = {
 export const fetchAllLeads = createAsyncThunk(
   'leads/fetchAll',
   async () => {
-    // Obtener leads de ambos estados y combinarlos
-    const [newLeads, qualifiedLeads] = await Promise.all([
-      Admin.leadsByStatus('NEW'),
-      Admin.leadsByStatus('QUALIFIED')
-    ]);
+    // Usar el endpoint del bot que ya tiene todos los leads con los nuevos estados
+    const response = await fetch('/api/bot/leads');
+    const data = await response.json();
     
-    const allLeads = [
-      ...(newLeads.items || []),
-      ...(qualifiedLeads.items || [])
-    ];
-    
-    return allLeads;
+    if (data.success) {
+      return data.leads || [];
+    } else {
+      throw new Error('Error al obtener leads del bot');
+    }
   }
 );
 
 export const fetchLeadsByStatus = createAsyncThunk(
   'leads/fetchByStatus',
-  async (status: 'NEW' | 'QUALIFIED') => {
-    const response = await Admin.leadsByStatus(status);
-    return response.items || [];
+  async (status: 'NUEVO' | 'CALIFICANDO' | 'CALIFICADO' | 'AGENDANDO_VISITA' | 'PROCESO_COMPLETADO') => {
+    // Usar el endpoint del bot que ya tiene todos los leads con los nuevos estados
+    const response = await fetch('/api/bot/leads');
+    const data = await response.json();
+    
+    if (data.success) {
+      // Filtrar por el status específico
+      return (data.leads || []).filter((lead: Lead) => lead.Status === status);
+    } else {
+      throw new Error('Error al obtener leads del bot');
+    }
   }
 );
 
