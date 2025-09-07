@@ -67,7 +67,7 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
         
         // Extraer el mensaje de la respuesta XML
         const messageMatch = xmlText.match(/<Message>([\s\S]*?)<\/Message>/);
-        const reply = messageMatch ? messageMatch[1] : 'No se pudo procesar la respuesta';
+        const reply = messageMatch ? messageMatch[1].trim() : 'Disculpa, tuve un problema técnico. Podés intentar de nuevo en un momento?';
         
         // Obtener información del lead desde la base de datos
         const leadResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/lead?lead_id=${phoneNumber}`, {
@@ -178,14 +178,14 @@ function generateLeadInfo(phoneNumber: string, originalMessage: string, lowerMes
   // Mantener información existente y agregar nueva
   const leadInfo = {
     LeadId: phoneNumber,
-    Status: existingLeadInfo.Status || 'NUEVO',
-    Stage: existingLeadInfo.Stage || 'PRECALIFICACION',
-    Intent: existingLeadInfo.Intent,
-    Rooms: existingLeadInfo.Rooms,
-    Budget: existingLeadInfo.Budget,
-    Neighborhood: existingLeadInfo.Neighborhood,
-    PropertyId: existingLeadInfo.PropertyId,
-    QualificationData: existingLeadInfo.QualificationData || {
+    Status: existingLeadInfo?.Status || 'NUEVO',
+    Stage: existingLeadInfo?.Stage || 'PRECALIFICACION',
+    Intent: existingLeadInfo?.Intent || null,
+    Rooms: existingLeadInfo?.Rooms || null,
+    Budget: existingLeadInfo?.Budget || null,
+    Neighborhood: existingLeadInfo?.Neighborhood || null,
+    PropertyId: existingLeadInfo?.PropertyId || null,
+    QualificationData: existingLeadInfo?.QualificationData || {
       property_confirmed: false,
       buyer_confirmed: false,
       motive_confirmed: false,
@@ -197,56 +197,68 @@ function generateLeadInfo(phoneNumber: string, originalMessage: string, lowerMes
     Missing: [] as string[]
   };
 
-  // Detectar intención
-  if (lowerMessage.includes('alquilar') || lowerMessage.includes('alquiler')) {
-    leadInfo.Intent = 'alquiler';
-  } else if (lowerMessage.includes('comprar') || lowerMessage.includes('venta')) {
-    leadInfo.Intent = 'venta';
+  // Detectar intención (solo si no está ya definida)
+  if (!leadInfo.Intent) {
+    if (lowerMessage.includes('alquilar') || lowerMessage.includes('alquiler')) {
+      leadInfo.Intent = 'alquiler';
+    } else if (lowerMessage.includes('comprar') || lowerMessage.includes('venta')) {
+      leadInfo.Intent = 'venta';
+    }
   }
 
-  // Detectar zona/barrio
-  if (lowerMessage.includes('nuñez')) {
-    leadInfo.Neighborhood = 'Núñez';
-  } else if (lowerMessage.includes('palermo')) {
-    leadInfo.Neighborhood = 'Palermo';
-  } else if (lowerMessage.includes('belgrano')) {
-    leadInfo.Neighborhood = 'Belgrano';
-  } else if (lowerMessage.includes('recoleta')) {
-    leadInfo.Neighborhood = 'Recoleta';
+  // Detectar zona/barrio (solo si no está ya definida)
+  if (!leadInfo.Neighborhood) {
+    if (lowerMessage.includes('nuñez')) {
+      leadInfo.Neighborhood = 'Núñez';
+    } else if (lowerMessage.includes('palermo')) {
+      leadInfo.Neighborhood = 'Palermo';
+    } else if (lowerMessage.includes('belgrano')) {
+      leadInfo.Neighborhood = 'Belgrano';
+    } else if (lowerMessage.includes('recoleta')) {
+      leadInfo.Neighborhood = 'Recoleta';
+    } else if (lowerMessage.includes('villa crespo')) {
+      leadInfo.Neighborhood = 'Villa Crespo';
+    } else if (lowerMessage.includes('caballito')) {
+      leadInfo.Neighborhood = 'Caballito';
+    }
   }
 
-  // Detectar cantidad de ambientes
-  const roomsMatch = lowerMessage.match(/(\d+)\s*(ambientes?|dormitorios?|habitaciones?|cuartos?)/);
-  if (roomsMatch) {
-    leadInfo.Rooms = parseInt(roomsMatch[1]);
-  } else if (lowerMessage.includes('monoambiente') || lowerMessage.includes('mono')) {
-    leadInfo.Rooms = 1;
+  // Detectar cantidad de ambientes (solo si no está ya definida)
+  if (!leadInfo.Rooms) {
+    const roomsMatch = lowerMessage.match(/(\d+)\s*(ambientes?|dormitorios?|habitaciones?|cuartos?)/);
+    if (roomsMatch) {
+      leadInfo.Rooms = parseInt(roomsMatch[1]);
+    } else if (lowerMessage.includes('monoambiente') || lowerMessage.includes('mono')) {
+      leadInfo.Rooms = 1;
+    }
   }
 
-  // Detectar presupuesto
-  const budgetPatterns = [
-    /(\d+)k/,  // 200k
-    /(\d+\.?\d*)\s*m/,  // 1.5M
-    /\$\s*(\d{1,3}(?:[.,]\d{3})*)/,  // $200,000
-    /(\d{1,3}(?:[.,]\d{3})*)\s*pesos?/,  // 200000 pesos
-    /presupuesto.*?(\d{1,3}(?:[.,]\d{3})*)/  // presupuesto 200000
-  ];
+  // Detectar presupuesto (solo si no está ya definido)
+  if (!leadInfo.Budget) {
+    const budgetPatterns = [
+      /(\d+)k/,  // 200k
+      /(\d+\.?\d*)\s*m/,  // 1.5M
+      /\$\s*(\d{1,3}(?:[.,]\d{3})*)/,  // $200,000
+      /(\d{1,3}(?:[.,]\d{3})*)\s*pesos?/,  // 200000 pesos
+      /presupuesto.*?(\d{1,3}(?:[.,]\d{3})*)/  // presupuesto 200000
+    ];
 
-  for (const pattern of budgetPatterns) {
-    const match = lowerMessage.match(pattern);
-    if (match) {
-      try {
-        let amount = match[1].replace(/[.,]/g, '');
-        if (pattern.source.includes('k')) {
-          leadInfo.Budget = parseInt(amount) * 1000;
-        } else if (pattern.source.includes('m')) {
-          leadInfo.Budget = parseInt((parseFloat(amount) * 1000000).toString());
-        } else {
-          leadInfo.Budget = parseInt(amount);
+    for (const pattern of budgetPatterns) {
+      const match = lowerMessage.match(pattern);
+      if (match) {
+        try {
+          let amount = match[1].replace(/[.,]/g, '');
+          if (pattern.source.includes('k')) {
+            leadInfo.Budget = parseInt(amount) * 1000;
+          } else if (pattern.source.includes('m')) {
+            leadInfo.Budget = parseInt((parseFloat(amount) * 1000000).toString());
+          } else {
+            leadInfo.Budget = parseInt(amount);
+          }
+          break;
+        } catch (e) {
+          // Ignorar errores de parsing
         }
-        break;
-      } catch (e) {
-        // Ignorar errores de parsing
       }
     }
   }
@@ -255,13 +267,18 @@ function generateLeadInfo(phoneNumber: string, originalMessage: string, lowerMes
   const allFields = ['Intent', 'Rooms', 'Budget', 'Neighborhood'];
   leadInfo.Missing = allFields.filter(field => !leadInfo[field as keyof typeof leadInfo]);
 
-  // Determinar estado y etapa
-  if (leadInfo.Missing.length <= 1) {
+  // Determinar estado y etapa basado en datos completados
+  const completedFields = [leadInfo.Intent, leadInfo.Rooms, leadInfo.Budget, leadInfo.Neighborhood].filter(field => field !== null && field !== undefined).length;
+  
+  if (completedFields >= 3) {
     leadInfo.Status = 'CALIFICADO';
     leadInfo.Stage = 'POST_CALIFICACION';
-  } else if (leadInfo.Intent && leadInfo.Neighborhood) {
+  } else if (completedFields >= 2) {
     leadInfo.Status = 'CALIFICANDO';
     leadInfo.Stage = 'CALIFICACION';
+  } else {
+    leadInfo.Status = 'NUEVO';
+    leadInfo.Stage = 'PRECALIFICACION';
   }
 
   return leadInfo;

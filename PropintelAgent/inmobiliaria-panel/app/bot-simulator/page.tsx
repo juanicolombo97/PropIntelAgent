@@ -88,6 +88,44 @@ export default function BotSimulatorPage() {
     loadExistingLeads();
   }, []);
 
+  // Polling para verificar mensajes nuevos del bot
+  useEffect(() => {
+    if (!phoneNumber || isLoading) return;
+
+    const pollForNewMessages = async () => {
+      try {
+        const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Actualizar información del lead si hay cambios
+          if (data.leadInfo && JSON.stringify(data.leadInfo) !== JSON.stringify(leadInfo)) {
+            setLeadInfo(data.leadInfo);
+          }
+          
+          // Verificar si hay mensajes nuevos del bot
+          if (data.history && data.history.length > messages.length) {
+            const newMessages = data.history.slice(messages.length).map((msg: any, index: number) => ({
+              id: (Date.now() + index).toString(),
+              content: msg.content,
+              sender: msg.role === 'user' ? 'user' : 'bot',
+              timestamp: new Date()
+            }));
+            
+            setMessages(prev => [...prev, ...newMessages]);
+          }
+        }
+      } catch (error) {
+        console.log('Error en polling:', error);
+      }
+    };
+
+    // Polling cada 2 segundos cuando hay una conversación activa
+    const interval = setInterval(pollForNewMessages, 2000);
+    
+    return () => clearInterval(interval);
+  }, [phoneNumber, messages.length, leadInfo, isLoading]);
+
   // Efecto para limpiar conversación cuando cambia el número de teléfono
   useEffect(() => {
     // Solo limpiar si ya hay un número de teléfono (no en la carga inicial)
@@ -106,7 +144,7 @@ export default function BotSimulatorPage() {
   }, [phoneNumber]);
 
   const sendMessage = async () => {
-    if (!currentMessage.trim() || isLoading) return;
+    if (!currentMessage.trim()) return;
     
     // Validar que se haya ingresado un número de teléfono
     if (!phoneNumber.trim()) {
@@ -122,6 +160,7 @@ export default function BotSimulatorPage() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageToSend = currentMessage;
     setCurrentMessage('');
     setIsLoading(true);
 
@@ -134,7 +173,7 @@ export default function BotSimulatorPage() {
         },
         body: JSON.stringify({
           phone_number: phoneNumber,
-          message: currentMessage
+          message: messageToSend
         })
       });
 
@@ -151,15 +190,15 @@ export default function BotSimulatorPage() {
         timestamp: new Date()
       };
 
-              setMessages(prev => [...prev, botMessage]);
+      setMessages(prev => [...prev, botMessage]);
         
-        // Actualizar información del lead
-        if (data.leadInfo) {
-          setLeadInfo(data.leadInfo);
-        }
+      // Actualizar información del lead
+      if (data.leadInfo) {
+        setLeadInfo(data.leadInfo);
+      }
 
-        // Recargar leads existentes para incluir el nuevo si es necesario
-        loadExistingLeads();
+      // Recargar leads existentes para incluir el nuevo si es necesario
+      loadExistingLeads();
 
     } catch (error) {
       console.error('Error:', error);
@@ -355,29 +394,47 @@ export default function BotSimulatorPage() {
                   <p className="text-sm">Primero ingresa un número de teléfono y luego escribe un mensaje</p>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
-                  >
+                <>
+                  {messages.map((message) => (
                     <div
-                      className={`max-w-[75%] px-4 py-3 rounded-2xl ${
-                        message.sender === 'user'
-                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
-                          : 'bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md'
-                      }`}
+                      key={message.id}
+                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
                     >
-                      <div className="space-y-1">
-                        <p className="text-sm leading-relaxed">{message.content}</p>
-                        <p className={`text-xs ${
-                          message.sender === 'user' ? 'text-blue-200' : 'text-slate-500'
-                        }`}>
-                          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                      <div
+                        className={`max-w-[75%] px-4 py-3 rounded-2xl ${
+                          message.sender === 'user'
+                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-br-md'
+                            : 'bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <p className="text-sm leading-relaxed">{message.content}</p>
+                          <p className={`text-xs ${
+                            message.sender === 'user' ? 'text-blue-200' : 'text-slate-500'
+                          }`}>
+                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  
+                  {/* Indicador de que el bot está escribiendo */}
+                  {isLoading && (
+                    <div className="flex justify-start mb-3">
+                      <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex space-x-1">
+                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                          </div>
+                          <span className="text-xs text-slate-500">Gonzalo está escribiendo...</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -397,10 +454,14 @@ export default function BotSimulatorPage() {
                 </div>
                 <Button
                   onClick={sendMessage}
-                  disabled={!currentMessage.trim() || !phoneNumber.trim() || isLoading}
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-4 py-3 rounded-xl"
+                  disabled={!currentMessage.trim() || !phoneNumber.trim()}
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-4 py-3 rounded-xl disabled:opacity-50"
                 >
-                  <Send size={18} />
+                  {isLoading ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send size={18} />
+                  )}
                 </Button>
               </div>
             </div>
