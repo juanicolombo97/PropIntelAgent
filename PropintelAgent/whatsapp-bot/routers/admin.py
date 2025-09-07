@@ -238,3 +238,36 @@ def create_visit(item: dict = Body(...), _: bool = Depends(verify_api_key)):
     # Espera: {LeadId, VisitAt, PropertyId, Confirmed}
     t_visits.put_item(Item=item)
     return {"ok": True, "id": f"{item.get('LeadId')}-{item.get('VisitAt')}"}
+
+@router.get("/pending-messages")
+def get_pending_messages(lead_id: str, _: bool = Depends(verify_api_key)):
+    """
+    Verifica si hay mensajes pendientes en la tabla de debounce para un lead específico
+    """
+    try:
+        # Verificar si existe la tabla de mensajes pendientes
+        pending_table_name = os.getenv("PENDING_MESSAGES_TABLE")
+        if not pending_table_name:
+            return {"hasPendingMessages": False, "message": "Debounce system not configured"}
+        
+        # Importar la tabla de mensajes pendientes
+        from services.dynamo import get_dynamo_resource
+        dynamodb = get_dynamo_resource()
+        pending_table = dynamodb.Table(pending_table_name)
+        
+        # Buscar mensajes pendientes para este lead
+        response = pending_table.query(
+            KeyConditionExpression=Key('LeadId').eq(lead_id)
+        )
+        
+        has_pending = len(response.get('Items', [])) > 0
+        
+        return {
+            "hasPendingMessages": has_pending,
+            "count": len(response.get('Items', [])),
+            "lead_id": lead_id
+        }
+        
+    except Exception as e:
+        print(f"❌ Error verificando mensajes pendientes: {e}")
+        return {"hasPendingMessages": False, "error": str(e)}

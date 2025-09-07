@@ -36,14 +36,32 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      // Verificar si hay mensajes pendientes en la tabla de debounce
+      const pendingMessagesResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/pending-messages?lead_id=${phoneNumber}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_CONFIG.ADMIN_API_KEY,
+        }
+      });
+
       let leadInfo = {};
       let history = [];
+      let hasPendingMessages = false;
 
       if (leadResponse.ok) {
         leadInfo = await leadResponse.json();
         console.log('✅ Lead info obtenida del bot real:', leadInfo);
       } else {
         console.log('❌ Error obteniendo lead info:', leadResponse.status);
+      }
+
+      if (pendingMessagesResponse.ok) {
+        const pendingData = await pendingMessagesResponse.json();
+        hasPendingMessages = pendingData.hasPendingMessages || false;
+        console.log('⏳ Mensajes pendientes:', hasPendingMessages);
+      } else {
+        console.log('❌ Error obteniendo mensajes pendientes:', pendingMessagesResponse.status);
       }
 
       if (messagesResponse.ok) {
@@ -66,7 +84,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         history,
-        leadInfo
+        leadInfo,
+        hasPendingMessages
       });
 
     } catch (error) {
@@ -93,7 +112,8 @@ export async function GET(request: NextRequest) {
             ready_to_close: false,
             decision_maker: false
           }
-        }
+        },
+        hasPendingMessages: false
       });
     }
 
