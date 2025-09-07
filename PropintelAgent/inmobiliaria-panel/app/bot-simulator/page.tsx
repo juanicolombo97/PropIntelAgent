@@ -175,7 +175,7 @@ export default function BotSimulatorPage() {
           // Solo quitar "Gonzalo está escribiendo" si hay mensajes nuevos del bot
           if (currentHistoryLength > lastMessageCount) {
             const newMessages = data.history.slice(lastMessageCount);
-            const hasNewBotMessages = newMessages.some(msg => msg.role === 'assistant');
+            const hasNewBotMessages = newMessages.some((msg: any) => msg.role === 'assistant');
             
             if (hasNewBotMessages) {
               console.log('✅ Hay mensajes nuevos del bot, quitando "Gonzalo está escribiendo"');
