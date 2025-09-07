@@ -160,11 +160,13 @@ class StageManager:
         # Analizar mensaje para datos de calificación
         qualification_updates = self.analyze_message_for_qualification_data(message, conversation_history)
         
+        # Obtener datos de calificación actuales
+        current_qual_data = lead_data.get("QualificationData", {})
+        
         # Actualizar datos de calificación si hay cambios
         if qualification_updates:
             update_qualification_data(lead_id, qualification_updates)
             # Actualizar datos locales
-            current_qual_data = lead_data.get("QualificationData", {})
             current_qual_data.update(qualification_updates)
             lead_data["QualificationData"] = current_qual_data
         
