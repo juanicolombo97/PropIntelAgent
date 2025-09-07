@@ -41,6 +41,7 @@ export default function BotSimulatorPage() {
   const [currentMessage, setCurrentMessage] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isBotTyping, setIsBotTyping] = useState(false);
   const [leadInfo, setLeadInfo] = useState<LeadInfo | null>(null);
   const [existingLeads, setExistingLeads] = useState<any[]>([]);
   const [showLeadSelector, setShowLeadSelector] = useState(false);
@@ -142,6 +143,7 @@ export default function BotSimulatorPage() {
             
             // Si hay mensajes nuevos del bot, ya no estamos esperando
             setWaitingForBotResponse(false);
+            setIsBotTyping(false); // El bot ya respondió
             
             // Actualizar el contador de mensajes
             setLastMessageCount(currentHistoryLength);
@@ -177,6 +179,7 @@ export default function BotSimulatorPage() {
       setCurrentMessage('');
       setLastMessageCount(0);
       setWaitingForBotResponse(false);
+      setIsBotTyping(false);
       
       // Mostrar notificación
       setShowNotification(true);
@@ -205,9 +208,12 @@ export default function BotSimulatorPage() {
     setMessages(prev => [...prev, userMessage]);
     const messageToSend = currentMessage;
     setCurrentMessage('');
-    // No mostrar loading al enviar mensaje
+    
+    // Mostrar "Gonzalo está escribiendo" inmediatamente al enviar mensaje
+    setIsBotTyping(true);
 
     try {
+      
       // Llamar al endpoint del bot
       const response = await fetch('/api/bot/test-message', {
         method: 'POST',
@@ -236,9 +242,11 @@ export default function BotSimulatorPage() {
         };
 
         setMessages(prev => [...prev, botMessage]);
+        setIsBotTyping(false); // El bot ya respondió
       } else {
         // Si no hay respuesta, significa que se envió al bot real
         setWaitingForBotResponse(true);
+        // Mantener "Gonzalo está escribiendo" hasta que llegue la respuesta del bot real
       }
         
       // Actualizar información del lead
@@ -273,6 +281,7 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setLastMessageCount(0);
       setWaitingForBotResponse(false);
+      setIsBotTyping(false);
     } catch (error) {
       console.error('Error al limpiar conversación:', error);
       // Limpiar en el cliente aunque falle el servidor
@@ -280,6 +289,7 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setLastMessageCount(0);
       setWaitingForBotResponse(false);
+      setIsBotTyping(false);
     }
   };
 
@@ -481,7 +491,7 @@ export default function BotSimulatorPage() {
                   ))}
                   
                   {/* Indicador de que el bot está escribiendo */}
-                  {isLoading && (
+                  {isBotTyping && !waitingForBotResponse && (
                     <div className="flex justify-start mb-3">
                       <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md">
                         <div className="flex items-center space-x-2">
