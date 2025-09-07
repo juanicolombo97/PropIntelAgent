@@ -88,12 +88,13 @@ export default function BotSimulatorPage() {
   }, [isLoading, messages.length]);
 
   useEffect(() => {
-    // Cargar leads existentes al montar el componente
-    loadExistingLeads();
+    // Cargar leads existentes al montar el componente (sin modal)
+    loadExistingLeads(false);
   }, []);
 
   // Polling para verificar mensajes nuevos del bot
   useEffect(() => {
+    console.log('🔄 useEffect de polling ejecutado para:', phoneNumber);
     if (!phoneNumber) return;
 
     let intervalId: NodeJS.Timeout;
@@ -159,11 +160,14 @@ export default function BotSimulatorPage() {
     // Polling cada 60 segundos (1 minuto) para detectar respuestas del bot real
     intervalId = setInterval(pollForNewMessages, 60000);
     
+    console.log('🔄 Polling iniciado cada 60 segundos para:', phoneNumber);
+    
     // Ejecutar inmediatamente al montar
     pollForNewMessages();
     
     return () => {
       if (intervalId) {
+        console.log('🛑 Polling detenido para:', phoneNumber);
         clearInterval(intervalId);
       }
     };
@@ -254,8 +258,8 @@ export default function BotSimulatorPage() {
         setLeadInfo(data.leadInfo);
       }
 
-      // Recargar leads existentes para incluir el nuevo si es necesario
-      loadExistingLeads();
+      // No cargar leads existentes después de enviar mensaje para evitar modal
+      // loadExistingLeads();
 
     } catch (error) {
       console.error('Error:', error);
@@ -293,9 +297,11 @@ export default function BotSimulatorPage() {
     }
   };
 
-  const loadExistingLeads = async () => {
+  const loadExistingLeads = async (showModal: boolean = true) => {
     try {
-      showLoading('Cargando usuarios existentes...');
+      if (showModal) {
+        showLoading('Cargando usuarios existentes...');
+      }
       const response = await fetch('/api/bot/leads');
       
       if (response.ok) {
@@ -305,7 +311,9 @@ export default function BotSimulatorPage() {
     } catch (error) {
       console.error('Error cargando leads:', error);
     } finally {
-      hideLoading();
+      if (showModal) {
+        hideLoading();
+      }
     }
   };
 
