@@ -47,6 +47,7 @@ export default function BotSimulatorPage() {
   const [showNotification, setShowNotification] = useState(false);
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [isPolling, setIsPolling] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const showLoading = (message: string) => {
@@ -92,19 +93,35 @@ export default function BotSimulatorPage() {
   useEffect(() => {
     if (!phoneNumber) return;
 
+    let intervalId: NodeJS.Timeout;
+
     const pollForNewMessages = async () => {
       try {
+        setIsPolling(true);
+        console.log('🔄 Polling para mensajes nuevos...', phoneNumber);
         const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
         if (response.ok) {
           const data = await response.json();
+          console.log('📨 Datos del polling:', { 
+            historyLength: data.history?.length || 0, 
+            currentMessagesLength: messages.length,
+            hasNewMessages: data.history && data.history.length > messages.length
+          });
           
           // Actualizar información del lead si hay cambios
-          if (data.leadInfo && JSON.stringify(data.leadInfo) !== JSON.stringify(leadInfo)) {
-            setLeadInfo(data.leadInfo);
+          if (data.leadInfo) {
+            setLeadInfo(prevLeadInfo => {
+              if (JSON.stringify(data.leadInfo) !== JSON.stringify(prevLeadInfo)) {
+                console.log('📊 Lead info actualizada:', data.leadInfo);
+                return data.leadInfo;
+              }
+              return prevLeadInfo;
+            });
           }
           
           // Verificar si hay mensajes nuevos del bot
           if (data.history && data.history.length > messages.length) {
+            console.log('🆕 Mensajes nuevos detectados:', data.history.length - messages.length);
             const newMessages = data.history.slice(messages.length).map((msg: any, index: number) => ({
               id: (Date.now() + index).toString(),
               content: msg.content,
@@ -112,20 +129,31 @@ export default function BotSimulatorPage() {
               timestamp: new Date()
             }));
             
-            setMessages(prev => [...prev, ...newMessages]);
+            setMessages(prev => {
+              console.log('➕ Agregando mensajes nuevos:', newMessages);
+              return [...prev, ...newMessages];
+            });
           }
         }
       } catch (error) {
-        console.log('Error en polling:', error);
+        console.log('❌ Error en polling:', error);
+      } finally {
+        setIsPolling(false);
       }
     };
 
-    // Polling cada 5 segundos cuando hay una conversación activa
-    // (más frecuente para detectar respuestas del bot real que tarda 3 minutos)
-    const interval = setInterval(pollForNewMessages, 5000);
+    // Polling cada 60 segundos (1 minuto) para detectar respuestas del bot real
+    intervalId = setInterval(pollForNewMessages, 60000);
     
-    return () => clearInterval(interval);
-  }, [phoneNumber, messages.length, leadInfo]);
+    // Ejecutar inmediatamente al montar
+    pollForNewMessages();
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [phoneNumber]); // Solo depende del phoneNumber
 
   // Efecto para limpiar conversación cuando cambia el número de teléfono
   useEffect(() => {
@@ -362,7 +390,15 @@ export default function BotSimulatorPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900 text-lg">Gonzalo</h3>
-                    <p className="text-sm text-slate-600">Agente Inmobiliario • En línea</p>
+                    <p className="text-sm text-slate-600 flex items-center gap-2">
+                      Agente Inmobiliario • En línea
+                      {isPolling && (
+                        <span className="flex items-center gap-1 text-blue-600">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                          <span className="text-xs">Verificando mensajes...</span>
+                        </span>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -371,8 +407,9 @@ export default function BotSimulatorPage() {
                     variant="secondary"
                     size="sm"
                     className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                    disabled={isPolling}
                   >
-                    <RefreshCw size={16} />
+                    <RefreshCw size={16} className={isPolling ? 'animate-spin' : ''} />
                   </Button>
                   <Button
                     onClick={clearConversation}

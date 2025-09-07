@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
     const BOT_WEBHOOK_URL = API_CONFIG.LAMBDA_API_URL;
     
     try {
-      const response = await fetch(`${BOT_WEBHOOK_URL}/admin/messages?lead_id=${phoneNumber}`, {
+      // Obtener mensajes del bot real
+      const messagesResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/messages?lead_id=${phoneNumber}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -26,38 +27,48 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Obtener información del lead
-        const leadResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/lead?lead_id=${phoneNumber}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': API_CONFIG.ADMIN_API_KEY,
-          }
-        });
-
-        let leadInfo = {};
-        if (leadResponse.ok) {
-          leadInfo = await leadResponse.json();
+      // Obtener información del lead
+      const leadResponse = await fetch(`${BOT_WEBHOOK_URL}/admin/lead?lead_id=${phoneNumber}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_CONFIG.ADMIN_API_KEY,
         }
+      });
 
-        console.log('✅ Historial obtenido del bot real para:', phoneNumber, data);
-        return NextResponse.json({
-          success: true,
-          history: (data.items || [])
-            .sort((a: any, b: any) => parseInt(a.Timestamp) - parseInt(b.Timestamp))
-            .map((msg: any) => ({
-              role: msg.Direction === 'out' ? 'assistant' : 'user',
-              content: msg.Text
-            })),
-          leadInfo: leadInfo
+      let leadInfo = {};
+      let history = [];
+
+      if (leadResponse.ok) {
+        leadInfo = await leadResponse.json();
+        console.log('✅ Lead info obtenida del bot real:', leadInfo);
+      } else {
+        console.log('❌ Error obteniendo lead info:', leadResponse.status);
+      }
+
+      if (messagesResponse.ok) {
+        const messagesData = await messagesResponse.json();
+        history = (messagesData.items || [])
+          .sort((a: any, b: any) => parseInt(a.Timestamp) - parseInt(b.Timestamp))
+          .map((msg: any) => ({
+            role: msg.Direction === 'out' ? 'assistant' : 'user',
+            content: msg.Text
+          }));
+        console.log('✅ Historial obtenido del bot real:', { 
+          phoneNumber, 
+          messagesCount: history.length,
+          messages: history 
         });
       } else {
-        console.log('❌ Error del bot real:', response.status, response.statusText);
-        throw new Error(`Bot real respondió con ${response.status}`);
+        console.log('❌ Error obteniendo mensajes:', messagesResponse.status);
       }
+
+      return NextResponse.json({
+        success: true,
+        history,
+        leadInfo
+      });
+
     } catch (error) {
       console.log('❌ Bot real no disponible:', (error as Error).message);
       // Devolver lista vacía en lugar de datos de ejemplo
