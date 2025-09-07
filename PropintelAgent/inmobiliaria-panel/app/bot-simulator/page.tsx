@@ -48,6 +48,7 @@ export default function BotSimulatorPage() {
   const [showLoadingModal, setShowLoadingModal] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isPolling, setIsPolling] = useState(false);
+  const [lastMessageCount, setLastMessageCount] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const showLoading = (message: string) => {
@@ -102,10 +103,12 @@ export default function BotSimulatorPage() {
         const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
         if (response.ok) {
           const data = await response.json();
+          const currentHistoryLength = data.history?.length || 0;
+          
           console.log('📨 Datos del polling:', { 
-            historyLength: data.history?.length || 0, 
-            currentMessagesLength: messages.length,
-            hasNewMessages: data.history && data.history.length > messages.length
+            historyLength: currentHistoryLength, 
+            lastMessageCount,
+            hasNewMessages: currentHistoryLength > lastMessageCount
           });
           
           // Actualizar información del lead si hay cambios
@@ -120,9 +123,11 @@ export default function BotSimulatorPage() {
           }
           
           // Verificar si hay mensajes nuevos del bot
-          if (data.history && data.history.length > messages.length) {
-            console.log('🆕 Mensajes nuevos detectados:', data.history.length - messages.length);
-            const newMessages = data.history.slice(messages.length).map((msg: any, index: number) => ({
+          if (currentHistoryLength > lastMessageCount) {
+            console.log('🆕 Mensajes nuevos detectados:', currentHistoryLength - lastMessageCount);
+            
+            // Obtener solo los mensajes nuevos
+            const newMessages = data.history.slice(lastMessageCount).map((msg: any, index: number) => ({
               id: (Date.now() + index).toString(),
               content: msg.content,
               sender: msg.role === 'user' ? 'user' : 'bot',
@@ -131,8 +136,18 @@ export default function BotSimulatorPage() {
             
             setMessages(prev => {
               console.log('➕ Agregando mensajes nuevos:', newMessages);
-              return [...prev, ...newMessages];
+              
+              // Remover mensajes de "esperando respuesta" si hay mensajes nuevos del bot
+              const filteredMessages = prev.filter(msg => 
+                !msg.content.includes('Mensaje enviado al bot real') && 
+                !msg.content.includes('La respuesta llegará en aproximadamente 3 minutos')
+              );
+              
+              return [...filteredMessages, ...newMessages];
             });
+            
+            // Actualizar el contador de mensajes
+            setLastMessageCount(currentHistoryLength);
           }
         }
       } catch (error) {
@@ -163,6 +178,7 @@ export default function BotSimulatorPage() {
       setMessages([]);
       setLeadInfo(null);
       setCurrentMessage('');
+      setLastMessageCount(0);
       
       // Mostrar notificación
       setShowNotification(true);
@@ -253,11 +269,13 @@ export default function BotSimulatorPage() {
       // Limpiar en el cliente
       setMessages([]);
       setLeadInfo(null);
+      setLastMessageCount(0);
     } catch (error) {
       console.error('Error al limpiar conversación:', error);
       // Limpiar en el cliente aunque falle el servidor
       setMessages([]);
       setLeadInfo(null);
+      setLastMessageCount(0);
     }
   };
 
@@ -315,6 +333,7 @@ export default function BotSimulatorPage() {
       }));
 
       setMessages(historyMessages);
+      setLastMessageCount(historyMessages.length);
       
       if (data.leadInfo) {
         setLeadInfo(data.leadInfo);
