@@ -1,7 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "rootDirectory": "PropintelAgent/inmobiliaria-panel"
+  "buildCommand": "cd PropintelAgent/inmobiliaria-panel && npm run build",
+  "outputDirectory": "PropintelAgent/inmobiliaria-panel/.next",
+  "installCommand": "cd PropintelAgent/inmobiliaria-panel && npm install",
+  "framework": "nextjs"
 }
