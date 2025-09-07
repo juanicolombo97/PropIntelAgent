@@ -163,33 +163,40 @@ export default function BotSimulatorPage() {
               timestamp: new Date()
             }));
             
-            // Verificar si el último mensaje nuevo es del bot
-            const lastNewMessage = newMessages[newMessages.length - 1];
-            const isLastMessageFromBot = lastNewMessage && lastNewMessage.sender === 'bot';
-            
-            console.log('🤖 Último mensaje nuevo es del bot:', isLastMessageFromBot, lastNewMessage);
-            console.log('⏳ Hay mensajes pendientes:', data.hasPendingMessages);
-            
             setMessages(prev => {
               console.log('➕ Agregando mensajes nuevos:', newMessages);
               return [...prev, ...newMessages];
             });
             
-            // Solo quitar indicadores si:
-            // 1. El último mensaje nuevo es del bot Y
-            // 2. No hay mensajes pendientes en la tabla de debounce
-            if (isLastMessageFromBot && !data.hasPendingMessages) {
-              console.log('✅ Bot respondió y no hay mensajes pendientes, quitando indicadores de espera');
-              setWaitingForBotResponse(false);
-              setIsBotTyping(false); // El bot ya respondió
-            } else if (isLastMessageFromBot && data.hasPendingMessages) {
-              console.log('⏳ Bot respondió pero hay mensajes pendientes, manteniendo indicadores');
-            } else {
-              console.log('⏳ Último mensaje es del usuario, manteniendo indicadores');
-            }
-            
             // Actualizar el contador de mensajes
             setLastMessageCount(currentHistoryLength);
+          }
+          
+          // Verificar estado de indicadores basado en mensajes pendientes
+          // (esto se ejecuta en cada polling, independientemente de si hay mensajes nuevos)
+          console.log('⏳ Verificando estado de indicadores:', {
+            hasPendingMessages: data.hasPendingMessages,
+            waitingForBotResponse,
+            isBotTyping
+          });
+          
+          // Si hay mensajes pendientes, mantener indicadores
+          if (data.hasPendingMessages) {
+            console.log('⏳ Hay mensajes pendientes, manteniendo indicadores');
+            // No hacer nada, mantener el estado actual
+          } else {
+            // Si no hay mensajes pendientes, verificar si el último mensaje es del bot
+            const lastMessage = data.history[data.history.length - 1];
+            const isLastMessageFromBot = lastMessage && lastMessage.role === 'assistant';
+            
+            if (isLastMessageFromBot && waitingForBotResponse) {
+              console.log('✅ No hay mensajes pendientes y último mensaje es del bot, quitando indicadores');
+              setWaitingForBotResponse(false);
+              setIsBotTyping(false);
+            } else if (!isLastMessageFromBot && waitingForBotResponse) {
+              console.log('⏳ No hay mensajes pendientes pero último mensaje es del usuario, manteniendo indicadores');
+              // Mantener indicadores
+            }
           }
         }
       } catch (error) {
