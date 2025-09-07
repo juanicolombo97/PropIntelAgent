@@ -85,7 +85,7 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
           }
           
           return {
-            reply: '✅ Mensaje enviado al bot real. La respuesta llegará en aproximadamente 3 minutos...',
+            reply: '', // No mostrar mensaje, solo el indicador azul
             leadInfo
           };
         } else {

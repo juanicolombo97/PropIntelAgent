@@ -49,6 +49,7 @@ export default function BotSimulatorPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isPolling, setIsPolling] = useState(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [waitingForBotResponse, setWaitingForBotResponse] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const showLoading = (message: string) => {
@@ -136,15 +137,11 @@ export default function BotSimulatorPage() {
             
             setMessages(prev => {
               console.log('➕ Agregando mensajes nuevos:', newMessages);
-              
-              // Remover mensajes de "esperando respuesta" si hay mensajes nuevos del bot
-              const filteredMessages = prev.filter(msg => 
-                !msg.content.includes('Mensaje enviado al bot real') && 
-                !msg.content.includes('La respuesta llegará en aproximadamente 3 minutos')
-              );
-              
-              return [...filteredMessages, ...newMessages];
+              return [...prev, ...newMessages];
             });
+            
+            // Si hay mensajes nuevos del bot, ya no estamos esperando
+            setWaitingForBotResponse(false);
             
             // Actualizar el contador de mensajes
             setLastMessageCount(currentHistoryLength);
@@ -179,6 +176,7 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setCurrentMessage('');
       setLastMessageCount(0);
+      setWaitingForBotResponse(false);
       
       // Mostrar notificación
       setShowNotification(true);
@@ -207,7 +205,7 @@ export default function BotSimulatorPage() {
     setMessages(prev => [...prev, userMessage]);
     const messageToSend = currentMessage;
     setCurrentMessage('');
-    setIsLoading(true);
+    // No mostrar loading al enviar mensaje
 
     try {
       // Llamar al endpoint del bot
@@ -228,14 +226,20 @@ export default function BotSimulatorPage() {
 
       const data = await response.json();
 
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: data.response,
-        sender: 'bot',
-        timestamp: new Date()
-      };
+      // Solo agregar mensaje del bot si hay contenido
+      if (data.response && data.response.trim()) {
+        const botMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: data.response,
+          sender: 'bot',
+          timestamp: new Date()
+        };
 
-      setMessages(prev => [...prev, botMessage]);
+        setMessages(prev => [...prev, botMessage]);
+      } else {
+        // Si no hay respuesta, significa que se envió al bot real
+        setWaitingForBotResponse(true);
+      }
         
       // Actualizar información del lead
       if (data.leadInfo) {
@@ -255,8 +259,6 @@ export default function BotSimulatorPage() {
       };
       setMessages(prev => [...prev, errorMessage]);
     }
-
-    setIsLoading(false);
   };
 
   const clearConversation = async () => {
@@ -270,12 +272,14 @@ export default function BotSimulatorPage() {
       setMessages([]);
       setLeadInfo(null);
       setLastMessageCount(0);
+      setWaitingForBotResponse(false);
     } catch (error) {
       console.error('Error al limpiar conversación:', error);
       // Limpiar en el cliente aunque falle el servidor
       setMessages([]);
       setLeadInfo(null);
       setLastMessageCount(0);
+      setWaitingForBotResponse(false);
     }
   };
 
@@ -493,16 +497,19 @@ export default function BotSimulatorPage() {
                   )}
 
                   {/* Indicador de espera del bot real */}
-                  {messages.some(msg => msg.content.includes('Mensaje enviado al bot real')) && (
+                  {waitingForBotResponse && (
                     <div className="flex justify-start mb-3">
-                      <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 shadow-sm rounded-bl-md">
-                        <div className="flex items-center space-x-2">
+                      <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-blue-900 shadow-sm rounded-bl-md">
+                        <div className="flex items-center space-x-3">
                           <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                            <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                           </div>
-                          <span className="text-xs text-blue-600">Esperando respuesta del bot real (~3 min)...</span>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-blue-700">Esperando respuesta del bot real</span>
+                            <span className="text-xs text-blue-500">La respuesta llegará en aproximadamente 3 minutos...</span>
+                          </div>
                         </div>
                       </div>
                     </div>
