@@ -16,10 +16,23 @@ interface Message {
 interface LeadInfo {
   LeadId: string;
   Status: string;
+  Stage: string;
   Intent: string | null;
   Rooms: number | null;
   Budget: number | null;
   Neighborhood: string | null;
+  PropertyId: string | null;
+  QualificationData?: {
+    property_confirmed: boolean;
+    buyer_confirmed: boolean;
+    motive_confirmed: boolean;
+    timeline_confirmed: boolean;
+    financing_confirmed: boolean;
+    ready_to_close: boolean;
+    needs_to_sell?: boolean;
+    has_preapproval?: boolean;
+    decision_maker: boolean;
+  };
   Missing?: string[];
 }
 
@@ -441,8 +454,10 @@ export default function BotSimulatorPage() {
                         <div className="flex items-center justify-between">
                           <span className="truncate">{lead.LeadId}</span>
                           <span className={`px-1 py-0.5 rounded text-xs ${
-                            lead.Status === 'QUALIFIED' 
+                            lead.Status === 'CALIFICADO' 
                               ? 'bg-green-100 text-green-700'
+                              : lead.Status === 'CALIFICANDO'
+                              ? 'bg-blue-100 text-blue-700'
                               : 'bg-yellow-100 text-yellow-700'
                           }`}>
                             {lead.Status}
@@ -464,19 +479,40 @@ export default function BotSimulatorPage() {
             </h3>
             
             {leadInfo ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
+                {/* Estado y Etapa */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <p className="text-slate-500 mb-1">Estado</p>
                     <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                      leadInfo.Status === 'QUALIFIED' 
+                      leadInfo.Status === 'CALIFICADO' 
                         ? 'bg-green-100 text-green-800'
+                        : leadInfo.Status === 'CALIFICANDO'
+                        ? 'bg-blue-100 text-blue-800'
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
                       {leadInfo.Status}
                     </span>
                   </div>
                   
+                  <div>
+                    <p className="text-slate-500 mb-1">Etapa</p>
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                      leadInfo.Stage === 'FINALIZADO' 
+                        ? 'bg-green-100 text-green-800'
+                        : leadInfo.Stage === 'POST_CALIFICACION'
+                        ? 'bg-blue-100 text-blue-800'
+                        : leadInfo.Stage === 'CALIFICACION'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {leadInfo.Stage}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Datos básicos */}
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <p className="text-slate-500 mb-1">Intención</p>
                     <p className="font-medium">{leadInfo.Intent || 'No definida'}</p>
@@ -491,17 +527,48 @@ export default function BotSimulatorPage() {
                     <p className="text-slate-500 mb-1">Ambientes</p>
                     <p className="font-medium">{leadInfo.Rooms || 'No definido'}</p>
                   </div>
+                  
+                  <div>
+                    <p className="text-slate-500 mb-1">Presupuesto</p>
+                    <p className="font-medium">
+                      {leadInfo.Budget 
+                        ? `$${leadInfo.Budget.toLocaleString()}`
+                        : 'No definido'
+                      }
+                    </p>
+                  </div>
                 </div>
-                
-                <div>
-                  <p className="text-slate-500 mb-1">Presupuesto</p>
-                  <p className="font-medium">
-                    {leadInfo.Budget 
-                      ? `$${leadInfo.Budget.toLocaleString()}`
-                      : 'No definido'
-                    }
-                  </p>
-                </div>
+
+                {/* Propiedad confirmada */}
+                {leadInfo.PropertyId && (
+                  <div>
+                    <p className="text-slate-500 mb-1">Propiedad</p>
+                    <p className="font-medium text-green-700">ID: {leadInfo.PropertyId}</p>
+                  </div>
+                )}
+
+                {/* Datos de calificación */}
+                {leadInfo.QualificationData && (
+                  <div>
+                    <p className="text-slate-500 mb-1">Progreso de calificación</p>
+                    <div className="space-y-1">
+                      {Object.entries(leadInfo.QualificationData).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between text-xs">
+                          <span className="text-slate-600 capitalize">
+                            {key.replace('_', ' ')}
+                          </span>
+                          <span className={`px-1.5 py-0.5 rounded-full text-xs ${
+                            value 
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {value ? '✓' : '○'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {leadInfo.Missing && leadInfo.Missing.length > 0 && (
                   <div>

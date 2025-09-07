@@ -37,34 +37,31 @@ async def webhook(request: Request, From: str = Form(...), Body: str = Form(...)
         
         print(f"📱 Webhook con cola: {lead_id} -> '{message_text}'")
         
-        # Detectar si viene del Lambda Processor
+        # Detectar origen del mensaje
         is_from_processor = request.headers.get('X-From-Processor') == 'true'
+        is_from_debounce = request.headers.get('X-From-Debounce') == 'true'
         
-        # Guardar mensaje SOLO si NO viene del processor (evitar duplicados)
-        if not is_from_processor:
+        # Guardar mensaje solo si es original (no viene de processor ni debounce)
+        if not is_from_processor and not is_from_debounce:
             put_message(lead_id, message_text, direction="in")
         else:
-            print(f"🔄 Mensaje del Lambda Processor, no guardando entrada")
+            source = "Lambda Processor" if is_from_processor else "Debounce System"
+            print(f"🔄 Mensaje del {source}, no guardando entrada")
         
-        # Si NO viene del processor, enviar a cola SQS
-        if not is_from_processor:
-            from services.message_queue import send_message_to_queue
+        # Si es mensaje original, usar sistema de debounce
+        if not is_from_processor and not is_from_debounce:
+            from services.message_debounce import add_message_to_debounce
             
-            queue_enabled = os.getenv('MESSAGE_QUEUE_URL') is not None
+            debounce_success = add_message_to_debounce(lead_id, message_text)
             
-            if queue_enabled:
-                # Para colas Standard, el batching lo maneja el trigger (Maximum batching window)
-                # Enviar sin delay para permitir la agregación de mensajes
-                queue_success = send_message_to_queue(lead_id, message_text, delay_seconds=0)
-                
-                if queue_success:
-                    print(f"📦 Mensaje enviado a cola, procesamiento diferido")
-                    # Respuesta vacía a WhatsApp (evita timeout)
-                    return PlainTextResponse("<Response></Response>", media_type="application/xml")
-                else:
-                    print(f"⚠️ Cola no disponible, procesando directamente")
+            if debounce_success:
+                print(f"🕰️ Mensaje agregado al sistema de debounce")
+                # Respuesta vacía a WhatsApp (evita timeout)
+                return PlainTextResponse("<Response></Response>", media_type="application/xml")
+            else:
+                print(f"⚠️ Debounce no disponible, procesando directamente")
         else:
-            print(f"🔄 Mensaje del processor, procesando directamente (no enviando a cola)")
+            print(f"🔄 Mensaje de sistema, procesando directamente")
         
         # Procesamiento directo (viene del processor o fallback)
         response = process_lead_message(lead_id, message_text)

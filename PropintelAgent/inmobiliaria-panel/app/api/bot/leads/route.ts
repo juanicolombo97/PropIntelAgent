@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     
     try {
       // Obtener leads con diferentes statuses y combinarlos
-      const statuses = ['NEW', 'QUALIFIED', 'SCHEDULED', 'COMPLETED'];
+      const statuses = ['NUEVO', 'CALIFICANDO', 'CALIFICADO', 'AGENDANDO_VISITA', 'PROCESO_COMPLETADO'];
       let allLeads: any[] = [];
       
       for (const status of statuses) {

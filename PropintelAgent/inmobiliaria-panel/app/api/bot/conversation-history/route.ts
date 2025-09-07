@@ -66,11 +66,22 @@ export async function GET(request: NextRequest) {
         history: [],
         leadInfo: {
           LeadId: phoneNumber,
-          Status: 'NEW',
+          Status: 'NUEVO',
+          Stage: 'PRECALIFICACION',
           Intent: null,
           Rooms: null,
           Budget: null,
-          Neighborhood: null
+          Neighborhood: null,
+          PropertyId: null,
+          QualificationData: {
+            property_confirmed: false,
+            buyer_confirmed: false,
+            motive_confirmed: false,
+            timeline_confirmed: false,
+            financing_confirmed: false,
+            ready_to_close: false,
+            decision_maker: false
+          }
         }
       });
     }

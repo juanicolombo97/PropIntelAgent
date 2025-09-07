@@ -14,9 +14,11 @@ interface LeadsTableProps {
 export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
   const getStatusBadge = (status: string) => {
     const variants = {
-      NEW: 'warning' as const,
-      QUALIFIED: 'success' as const,
-      DISQUALIFIED: 'danger' as const,
+      NUEVO: 'warning' as const,
+      CALIFICANDO: 'info' as const,
+      CALIFICADO: 'success' as const,
+      AGENDANDO_VISITA: 'info' as const,
+      PROCESO_COMPLETADO: 'default' as const,
     };
     return <Badge variant={variants[status as keyof typeof variants] || 'default'}>{status}</Badge>;
   };
@@ -36,6 +38,7 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
               <TableHeaderCell>Lead ID</TableHeaderCell>
               <TableHeaderCell>Nombre</TableHeaderCell>
               <TableHeaderCell>Estado</TableHeaderCell>
+              <TableHeaderCell>Etapa</TableHeaderCell>
               <TableHeaderCell>Intención</TableHeaderCell>
               <TableHeaderCell>Habitaciones</TableHeaderCell>
               <TableHeaderCell>Presupuesto</TableHeaderCell>
@@ -63,6 +66,9 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
                 </TableCell>
                 <TableCell>{lead.FullName || '-'}</TableCell>
                 <TableCell>{getStatusBadge(lead.Status)}</TableCell>
+                <TableCell>
+                  <Badge variant="default">{lead.Stage || '-'}</Badge>
+                </TableCell>
                 <TableCell>{lead.Intent || '-'}</TableCell>
                 <TableCell>{lead.Rooms || '-'}</TableCell>
                 <TableCell>{formatBudget(lead.Budget)}</TableCell>

@@ -151,11 +151,22 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
       reply: 'Disculpa, tuve un problema técnico. Podés intentar de nuevo en un momento?',
       leadInfo: {
         LeadId: phoneNumber,
-        Status: 'NEW',
+        Status: 'NUEVO',
+        Stage: 'PRECALIFICACION',
         Intent: null,
         Rooms: null,
         Budget: null,
         Neighborhood: null,
+        PropertyId: null,
+        QualificationData: {
+          property_confirmed: false,
+          buyer_confirmed: false,
+          motive_confirmed: false,
+          timeline_confirmed: false,
+          financing_confirmed: false,
+          ready_to_close: false,
+          decision_maker: false
+        },
         Missing: ['Intent', 'Rooms', 'Budget', 'Neighborhood']
       }
     };
@@ -167,11 +178,22 @@ function generateLeadInfo(phoneNumber: string, originalMessage: string, lowerMes
   // Mantener información existente y agregar nueva
   const leadInfo = {
     LeadId: phoneNumber,
-    Status: existingLeadInfo.Status || 'NEW',
+    Status: existingLeadInfo.Status || 'NUEVO',
+    Stage: existingLeadInfo.Stage || 'PRECALIFICACION',
     Intent: existingLeadInfo.Intent,
     Rooms: existingLeadInfo.Rooms,
     Budget: existingLeadInfo.Budget,
     Neighborhood: existingLeadInfo.Neighborhood,
+    PropertyId: existingLeadInfo.PropertyId,
+    QualificationData: existingLeadInfo.QualificationData || {
+      property_confirmed: false,
+      buyer_confirmed: false,
+      motive_confirmed: false,
+      timeline_confirmed: false,
+      financing_confirmed: false,
+      ready_to_close: false,
+      decision_maker: false
+    },
     Missing: [] as string[]
   };
 
@@ -233,9 +255,13 @@ function generateLeadInfo(phoneNumber: string, originalMessage: string, lowerMes
   const allFields = ['Intent', 'Rooms', 'Budget', 'Neighborhood'];
   leadInfo.Missing = allFields.filter(field => !leadInfo[field as keyof typeof leadInfo]);
 
-  // Determinar estado
+  // Determinar estado y etapa
   if (leadInfo.Missing.length <= 1) {
-    leadInfo.Status = 'QUALIFIED';
+    leadInfo.Status = 'CALIFICADO';
+    leadInfo.Stage = 'POST_CALIFICACION';
+  } else if (leadInfo.Intent && leadInfo.Neighborhood) {
+    leadInfo.Status = 'CALIFICANDO';
+    leadInfo.Stage = 'CALIFICACION';
   }
 
   return leadInfo;

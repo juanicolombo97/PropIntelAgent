@@ -10,9 +10,11 @@ interface LeadProfileProps {
 export function LeadProfile({ lead }: LeadProfileProps) {
   const getStatusBadge = (status: string) => {
     const variants = {
-      NEW: 'warning' as const,
-      QUALIFIED: 'success' as const,
-      DISQUALIFIED: 'danger' as const,
+      NUEVO: 'warning' as const,
+      CALIFICANDO: 'info' as const,
+      CALIFICADO: 'success' as const,
+      AGENDANDO_VISITA: 'info' as const,
+      PROCESO_COMPLETADO: 'default' as const,
     };
     return <Badge variant={variants[status as keyof typeof variants] || 'default'}>{status}</Badge>;
   };

@@ -17,14 +17,73 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 def lambda_handler(event, context):
     """
-    Handler del Lambda Procesador - Agrupa mensajes y llama al webhook.
+    Handler del Lambda Procesador - Maneja tanto SQS como eventos de debounce.
     """
     try:
         print(f"🔄 Lambda Procesador iniciado")
+        
+        # Detectar tipo de evento
+        if 'action' in event and event['action'] == 'process_debounced_messages':
+            # Evento de debounce desde EventBridge Scheduler
+            return handle_debounce_event(event, context)
+        else:
+            # Evento tradicional de SQS (mantener compatibilidad)
+            return handle_sqs_event(event, context)
+            
+    except Exception as e:
+        print(f"❌ Error general en lambda_processor: {e}")
+        import traceback
+        print(f"❌ Stack trace: {traceback.format_exc()}")
+        
+        return {
+            'statusCode': 500,
+            'body': json.dumps({
+                'error': str(e),
+                'message': 'Error en procesamiento'
+            })
+        }
+
+def handle_debounce_event(event, context):
+    """
+    Maneja eventos de debounce desde EventBridge Scheduler.
+    """
+    try:
+        lead_id = event['lead_id']
+        scheduled_time = event['scheduled_time']
+        
+        print(f"🕰️ Procesando evento de debounce para {lead_id}")
+        
+        from services.message_debounce import process_debounced_messages
+        success = process_debounced_messages(lead_id, scheduled_time)
+        
+        return {
+            'statusCode': 200 if success else 500,
+            'body': json.dumps({
+                'message': f'Debounce procesado para {lead_id}',
+                'success': success
+            })
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en handle_debounce_event: {e}")
+        return {
+            'statusCode': 500,
+            'body': json.dumps({'error': str(e)})
+        }
+
+def handle_sqs_event(event, context):
+    """
+    Maneja eventos tradicionales de SQS (compatibilidad hacia atrás).
+    """
+    try:
         print(f"📦 Recibidos {len(event.get('Records', []))} registros de SQS")
         
         # Agrupar mensajes por lead_id
         messages_by_lead = defaultdict(list)
+        
+        print(f"🔍 Registros SQS recibidos:")
+        for i, record in enumerate(event.get('Records', [])):
+            print(f"  {i+1}. Body: {record.get('body', 'N/A')[:100]}...")
         
         for record in event.get('Records', []):
             try:
@@ -38,7 +97,7 @@ def lambda_handler(event, context):
                     print(f"❌ Mensaje inválido: {message_body}")
                     continue
                 
-                print(f"📱 Recibido: {lead_id} -> '{message}'")
+                print(f"📱 Recibido: {lead_id} -> '{message}' (timestamp: {timestamp})")
                 
                 # Agregar al grupo del lead
                 messages_by_lead[lead_id].append({
@@ -49,6 +108,11 @@ def lambda_handler(event, context):
             except Exception as e:
                 print(f"❌ Error procesando registro: {e}")
         
+        # Mostrar resumen de agrupación
+        print(f"📋 Resumen de agrupación:")
+        for lead_id, messages in messages_by_lead.items():
+            print(f"  Lead {lead_id}: {len(messages)} mensajes")
+        
         # Procesar cada lead
         processed_leads = 0
         
@@ -56,9 +120,23 @@ def lambda_handler(event, context):
             try:
                 print(f"🔄 Procesando lead {lead_id} con {len(messages)} mensajes")
                 
-                # Combinar mensajes
-                combined_message = " ".join([msg['message'] for msg in messages])
+                # Ordenar mensajes por timestamp para mantener orden cronológico
+                sorted_messages = sorted(messages, key=lambda x: x.get('timestamp', ''))
+                
+                # Combinar mensajes de forma más inteligente
+                message_texts = [msg['message'].strip() for msg in sorted_messages if msg['message'].strip()]
+                
+                if len(message_texts) == 1:
+                    combined_message = message_texts[0]
+                elif len(message_texts) <= 3:
+                    # Para pocos mensajes, combinar con punto y espacio
+                    combined_message = ". ".join(message_texts)
+                else:
+                    # Para muchos mensajes, tomar primero y últimos 2
+                    combined_message = f"{message_texts[0]}. {message_texts[-2]}. {message_texts[-1]}"
+                
                 print(f"💬 Mensaje combinado: '{combined_message}'")
+                print(f"📝 Mensajes originales: {[msg['message'] for msg in sorted_messages]}")
                 
                 # Llamar al webhook principal con el mensaje combinado
                 webhook_response = call_webhook(lead_id, combined_message)
@@ -84,7 +162,7 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
-        print(f"❌ Error general en lambda_processor: {e}")
+        print(f"❌ Error en handle_sqs_event: {e}")
         import traceback
         print(f"❌ Stack trace: {traceback.format_exc()}")
         
@@ -92,7 +170,7 @@ def lambda_handler(event, context):
             'statusCode': 500,
             'body': json.dumps({
                 'error': str(e),
-                'message': 'Error en procesamiento'
+                'message': 'Error en procesamiento SQS'
             })
         }
 
