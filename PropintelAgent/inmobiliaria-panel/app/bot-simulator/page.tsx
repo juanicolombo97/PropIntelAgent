@@ -111,7 +111,9 @@ export default function BotSimulatorPage() {
           console.log('📨 Datos del polling:', { 
             historyLength: currentHistoryLength, 
             lastMessageCount,
-            hasNewMessages: currentHistoryLength > lastMessageCount
+            hasNewMessages: currentHistoryLength > lastMessageCount,
+            waitingForBot: waitingForBotResponse,
+            isBotTyping: isBotTyping
           });
           
           // Actualizar información del lead si hay cambios
@@ -131,20 +133,31 @@ export default function BotSimulatorPage() {
             
             // Obtener solo los mensajes nuevos
             const newMessages = data.history.slice(lastMessageCount).map((msg: any, index: number) => ({
-              id: (Date.now() + index).toString(),
+              id: `new_${Date.now()}_${index}`,
               content: msg.content,
               sender: msg.role === 'user' ? 'user' : 'bot',
               timestamp: new Date()
             }));
+            
+            // Verificar si el último mensaje nuevo es del bot
+            const lastNewMessage = newMessages[newMessages.length - 1];
+            const isLastMessageFromBot = lastNewMessage && lastNewMessage.sender === 'bot';
+            
+            console.log('🤖 Último mensaje nuevo es del bot:', isLastMessageFromBot, lastNewMessage);
             
             setMessages(prev => {
               console.log('➕ Agregando mensajes nuevos:', newMessages);
               return [...prev, ...newMessages];
             });
             
-            // Si hay mensajes nuevos del bot, ya no estamos esperando
-            setWaitingForBotResponse(false);
-            setIsBotTyping(false); // El bot ya respondió
+            // Solo quitar indicadores si el último mensaje nuevo es del bot
+            if (isLastMessageFromBot) {
+              console.log('✅ Bot respondió, quitando indicadores de espera');
+              setWaitingForBotResponse(false);
+              setIsBotTyping(false); // El bot ya respondió
+            } else {
+              console.log('⏳ Último mensaje es del usuario, manteniendo indicadores');
+            }
             
             // Actualizar el contador de mensajes
             setLastMessageCount(currentHistoryLength);
@@ -348,7 +361,7 @@ export default function BotSimulatorPage() {
       
       // Convertir el historial a formato de mensajes
       const historyMessages: Message[] = data.history.map((msg: any, index: number) => ({
-        id: index.toString(),
+        id: `history_${index}_${Date.now()}`,
         content: msg.content,
         sender: msg.role === 'user' ? 'user' : 'bot',
         timestamp: new Date()
@@ -356,6 +369,12 @@ export default function BotSimulatorPage() {
 
       setMessages(historyMessages);
       setLastMessageCount(historyMessages.length);
+      
+      console.log('📚 Historial cargado:', {
+        phoneNumber: phoneToUse,
+        messagesCount: historyMessages.length,
+        lastMessageCount: historyMessages.length
+      });
       
       if (data.leadInfo) {
         setLeadInfo(data.leadInfo);
