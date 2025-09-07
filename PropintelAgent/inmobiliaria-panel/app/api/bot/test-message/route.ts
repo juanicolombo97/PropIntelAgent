@@ -82,6 +82,9 @@ async function callWhatsAppBot(phoneNumber: string, message: string) {
           let leadInfo = { LeadId: phoneNumber, Status: 'NUEVO' };
           if (leadResponse.ok) {
             leadInfo = await leadResponse.json();
+            console.log('📊 Lead info obtenida después de enviar mensaje:', leadInfo);
+          } else {
+            console.log('❌ Error obteniendo lead info después de enviar mensaje:', leadResponse.status);
           }
           
           return {

@@ -119,8 +119,32 @@ export default function BotSimulatorPage() {
           // Actualizar información del lead si hay cambios
           if (data.leadInfo) {
             setLeadInfo(prevLeadInfo => {
-              if (JSON.stringify(data.leadInfo) !== JSON.stringify(prevLeadInfo)) {
-                console.log('📊 Lead info actualizada:', data.leadInfo);
+              // Comparar campos específicos para detectar cambios
+              const hasChanges = !prevLeadInfo || 
+                prevLeadInfo.Status !== data.leadInfo.Status ||
+                prevLeadInfo.Stage !== data.leadInfo.Stage ||
+                prevLeadInfo.Intent !== data.leadInfo.Intent ||
+                prevLeadInfo.Neighborhood !== data.leadInfo.Neighborhood ||
+                prevLeadInfo.Rooms !== data.leadInfo.Rooms ||
+                prevLeadInfo.Budget !== data.leadInfo.Budget ||
+                prevLeadInfo.PropertyId !== data.leadInfo.PropertyId ||
+                JSON.stringify(prevLeadInfo.QualificationData) !== JSON.stringify(data.leadInfo.QualificationData);
+              
+              if (hasChanges) {
+                console.log('📊 Lead info actualizada:', {
+                  anterior: prevLeadInfo,
+                  nueva: data.leadInfo,
+                  cambios: {
+                    Status: prevLeadInfo?.Status !== data.leadInfo.Status,
+                    Stage: prevLeadInfo?.Stage !== data.leadInfo.Stage,
+                    Intent: prevLeadInfo?.Intent !== data.leadInfo.Intent,
+                    Neighborhood: prevLeadInfo?.Neighborhood !== data.leadInfo.Neighborhood,
+                    Rooms: prevLeadInfo?.Rooms !== data.leadInfo.Rooms,
+                    Budget: prevLeadInfo?.Budget !== data.leadInfo.Budget,
+                    PropertyId: prevLeadInfo?.PropertyId !== data.leadInfo.PropertyId,
+                    QualificationData: JSON.stringify(prevLeadInfo?.QualificationData) !== JSON.stringify(data.leadInfo.QualificationData)
+                  }
+                });
                 return data.leadInfo;
               }
               return prevLeadInfo;
@@ -268,6 +292,7 @@ export default function BotSimulatorPage() {
         
       // Actualizar información del lead
       if (data.leadInfo) {
+        console.log('📊 Lead info actualizada desde sendMessage:', data.leadInfo);
         setLeadInfo(data.leadInfo);
       }
 
@@ -377,6 +402,7 @@ export default function BotSimulatorPage() {
       });
       
       if (data.leadInfo) {
+        console.log('📊 Lead info actualizada desde loadConversationHistory:', data.leadInfo);
         setLeadInfo(data.leadInfo);
       }
 
