@@ -34,11 +34,24 @@ def get_lead(lead_id: str) -> Dict[str, Any]:
         return resp["Item"]
     item = {
         "LeadId": lead_id,
-        "Status": "NEW",
+        "Status": "NUEVO",  # Usar nuevos estados
+        "Stage": "PRECALIFICACION",  # Nueva etapa por defecto
         "Intent": None,
         "Rooms": None,
         "Budget": None,
         "Neighborhood": None,
+        "PropertyId": None,  # Propiedad identificada
+        "QualificationData": {
+            "property_confirmed": False,
+            "buyer_confirmed": False,
+            "motive_confirmed": False,
+            "timeline_confirmed": False,
+            "financing_confirmed": False,
+            "ready_to_close": False,
+            "needs_to_sell": None,
+            "has_preapproval": None,
+            "decision_maker": False
+        },
         "CreatedAt": now_iso(),
         "UpdatedAt": now_iso(),
     }
@@ -177,3 +190,46 @@ def create_visit(lead_id: str, property_id: str, visit_iso: str, notes: str = No
         import traceback
         print(f"❌ STACK TRACE: {traceback.format_exc()}")
         return False
+
+def update_lead_stage_and_status(lead_id: str, stage: str, status: str, additional_fields: Dict[str, Any] = None):
+    """
+    Actualiza la etapa y estado del lead, junto con campos adicionales si se proporcionan
+    """
+    fields = {
+        "Stage": stage,
+        "Status": status
+    }
+    if additional_fields:
+        fields.update(additional_fields)
+    
+    update_lead(lead_id, fields)
+    print(f"📝 Lead {lead_id} actualizado: Stage={stage}, Status={status}")
+
+def update_qualification_data(lead_id: str, qualification_updates: Dict[str, Any]):
+    """
+    Actualiza los datos de calificación del lead
+    """
+    # Obtener datos actuales
+    lead = get_lead(lead_id)
+    current_qual_data = lead.get("QualificationData", {})
+    
+    # Mergear con nuevos datos
+    current_qual_data.update(qualification_updates)
+    
+    # Actualizar en la base de datos
+    update_lead(lead_id, {"QualificationData": current_qual_data})
+    print(f"📝 Datos de calificación actualizados para {lead_id}: {qualification_updates}")
+
+def get_stage_appropriate_context(lead_id: str, stage: str) -> List[Dict[str, str]]:
+    """
+    Obtiene el contexto apropiado según la etapa del lead
+    """
+    from models.lead_stages import LeadStage, get_stage_context_limit
+    
+    try:
+        stage_enum = LeadStage(stage)
+        limit = get_stage_context_limit(stage_enum)
+    except ValueError:
+        limit = 6  # Default
+    
+    return get_conversation_history(lead_id, limit=limit)

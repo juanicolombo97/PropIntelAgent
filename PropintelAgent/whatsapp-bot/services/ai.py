@@ -3,13 +3,26 @@ from typing import Dict, Any
 from datetime import datetime
 from config import OPENAI_API_KEY, OPENAI_MODEL
 
+# Debug directo de variables de entorno
+import os
+print(f"🔍 [DEBUG] os.getenv('OPENAI_API_KEY') directo: {bool(os.getenv('OPENAI_API_KEY'))}")
+print(f"🔍 [DEBUG] config.OPENAI_API_KEY: {bool(OPENAI_API_KEY)}")
+if os.getenv('OPENAI_API_KEY'):
+    print(f"🔍 [DEBUG] API Key directo (primeros 10): {os.getenv('OPENAI_API_KEY')[:10]}...")
+
 client = None
+print(f" [DEBUG] OPENAI_API_KEY presente: {bool(OPENAI_API_KEY)}")
 if OPENAI_API_KEY:
+    print(f"🔍 [DEBUG] API Key (primeros 10 chars): {OPENAI_API_KEY[:10]}...")
     try:
         from openai import OpenAI
         client = OpenAI(api_key=OPENAI_API_KEY)
-    except Exception:
+        print("✅ [DEBUG] Cliente OpenAI inicializado correctamente")
+    except Exception as e:
+        print(f"❌ [DEBUG] Error inicializando OpenAI: {e}")
         client = None
+else:
+    print("❌ [DEBUG] OPENAI_API_KEY no está configurada")
 
 AGENT_SYSTEM_PROMPT = """
 Sos Gonzalo, agente inmobiliario de Compromiso Inmobiliario en Argentina.
@@ -529,333 +542,129 @@ def get_fallback_properties(lead_data: dict) -> list:
         print(f"[GET_FALLBACK_PROPS][ERROR] {e}")
         return []
 
-def generate_agent_response(conversation_history: list, lead_data: dict, property_context: dict = None) -> str:
+def generate_stage_based_response(lead_data: dict, conversation_history: list, message: str) -> str:
     """
-    Genera la respuesta del agente usando exclusivamente el LLM con historial.
-    No aplica reglas conversacionales hardcodeadas; toda la lógica vive en el prompt.
+    Genera respuesta del agente basada en la etapa actual del lead.
+    Usa prompts específicos y contexto optimizado según la etapa.
     """
+    print(f"🔍 [DEBUG] generate_stage_based_response iniciado")
+    print(f"🔍 [DEBUG] lead_data: {lead_data}")
+    print(f"🔍 [DEBUG] message: {message}")
+    
     if not client:
         print("❌ ERROR: Cliente OpenAI no disponible")
         return None
     
     try:
-        # CRÍTICO: Si ya hay PendingPropertyId, usar ESA propiedad específica
-        pending_property_id = lead_data.get("PendingPropertyId")
-        if pending_property_id:
-            print(f"[DEBUG] Usando propiedad ya confirmada: {pending_property_id}")
-            # Obtener la propiedad específica confirmada
-            try:
-                from services.dynamo import t_props
-                from models.schemas import dec_to_native
-                
-                resp = t_props.get_item(Key={"PropertyId": pending_property_id})
-                item = resp.get("Item")
-                if item:
-                    prop = dec_to_native(item)
-                    available_properties = [{
-                        "PropertyId": prop.get("PropertyId"),
-                        "Title": prop.get("Title"),
-                        "Neighborhood": prop.get("Neighborhood"),
-                        "Rooms": prop.get("Rooms"),
-                        "Price": prop.get("Price"),
-                        "URL": prop.get("URL")
-                    }]
-                    print(f"[DEBUG] Propiedad confirmada cargada: {prop.get('Title', 'Sin título')}")
-                else:
-                    available_properties = []
-                    print(f"[DEBUG] ERROR: No se encontró la propiedad confirmada {pending_property_id}")
-            except Exception as e:
-                print(f"[DEBUG] ERROR obteniendo propiedad confirmada: {e}")
-                available_properties = []
-        else:
-            # Obtener propiedades filtradas para pasarle a la IA
-            available_properties = get_filtered_properties(lead_data)
-            print(f"[DEBUG] Propiedades filtradas encontradas: {len(available_properties)}")
-            if available_properties:
-                print(f"[DEBUG] Primera propiedad: {available_properties[0].get('Title', 'Sin título')}")
+        from services.stage_prompts import get_stage_prompt, get_stage_system_instructions
+        from services.stage_manager import stage_manager
         
-        # Contar cuántas veces se ha preguntado por más detalles
-        property_detail_requests = 0
-        for msg in conversation_history[-6:]:
-            if msg.get("role") == "assistant" and any(word in msg.get("content", "").lower() for word in ["detalles", "link", "título"]):
-                property_detail_requests += 1
+        # Obtener etapa y estado actual
+        current_stage = lead_data.get("Stage", "PRECALIFICACION")
+        current_status = lead_data.get("Status", "NUEVO")
         
-        print(f"[DEBUG] Intentos de obtener detalles: {property_detail_requests}")
+        print(f"🎯 Generando respuesta para etapa: {current_stage} - {current_status}")
         
-        # Construir información sobre datos faltantes para visita
-        missing_data = []
+        # Procesar transición de etapa antes de generar respuesta
+        updated_lead_data = stage_manager.process_stage_transition(
+            lead_data.get("LeadId"), lead_data, message, conversation_history
+        )
         
-        # 1) Propiedad específica - SOLO falta si no hay PendingPropertyId y no hay propiedades disponibles
-        if not pending_property_id and (not available_properties or len(available_properties) != 1):
-            missing_data.append("propiedad específica identificada")
+        # Usar datos actualizados
+        current_stage = updated_lead_data.get("Stage", "PRECALIFICACION")
+        current_status = updated_lead_data.get("Status", "NUEVO")
         
-        # 2) Para quién es la compra
-        buyer_confirmed = False
-        for msg in conversation_history[-10:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["para mi", "para mí", "es mío", "es para mi hijo", "puedo decidir", "para mia", "mio", "mía"]):
-                buyer_confirmed = True
-                break
-        if not buyer_confirmed:
-            missing_data.append("confirmar para quién es")
+        print(f"🎯 Etapa después de procesamiento: {current_stage} - {current_status}")
         
-        # 3) Motivo de búsqueda
-        motive_confirmed = False
-        for msg in conversation_history[-10:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["mudanza", "mudarme", "inversión", "invertir", "inversion", "inversor"]):
-                motive_confirmed = True
-                break
-        if not motive_confirmed:
-            missing_data.append("motivo de búsqueda")
+        # Obtener contexto específico para la etapa
+        context_data = {}
         
-        # 4) Capacidad económica
-        financing_confirmed = False
-        for msg in conversation_history[-10:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["ahorro", "crédito", "efectivo", "financio", "banco", "tengo", "suficiente"]):
-                financing_confirmed = True
-                break
-        if not lead_data.get("Budget") and not financing_confirmed:
-            missing_data.append("capacidad económica")
-        
-        # 5) Listo para cerrar - verificar si ya confirmó que puede avanzar
-        ready_to_close = False
-        for msg in conversation_history[-5:]:
-            if msg.get("role") == "user" and any(word in msg.get("content", "").lower() for word in ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar", "quiero comprar", "quiero alquilar", "me interesa"]):
-                ready_to_close = True
-                break
-        if not ready_to_close:
-            missing_data.append("confirmación de que puede avanzar")
-        
-        missing_info = ""
-        if missing_data:
-            missing_info = f"\n📋 DATOS FALTANTES para agendar visita: {', '.join(missing_data)}"
-        else:
-            missing_info = f"\n✅ TODOS LOS DATOS COMPLETADOS! PREGUNTA POR FECHA: 'Perfecto! Que día y horario te conviene para la visita?'"
-        
-        # Construir información del lead actual
-        lead_info = "\n📋 DATOS ACTUALES DEL LEAD:\n"
-        if lead_data.get("LeadId"):
-            lead_info += f"• Número de teléfono: {lead_data.get('LeadId')} (YA LO TIENES - NO lo pidas)\n"
-        if lead_data.get("Neighborhood"):
-            lead_info += f"• Barrio: {lead_data.get('Neighborhood')}\n"
-        if lead_data.get("Rooms"):
-            lead_info += f"• Ambientes: {lead_data.get('Rooms')}\n"
-        if lead_data.get("Budget"):
-            lead_info += f"• Presupuesto: ${lead_data.get('Budget'):,}\n"
-        if lead_data.get("Intent"):
-            lead_info += f"• Intención: {lead_data.get('Intent')}\n"
-        if pending_property_id:
-            lead_info += f"• Propiedad confirmada: {pending_property_id}\n"
-        
-        # Construir contexto de propiedades
-        property_info = lead_info + missing_info
-        
-        if available_properties:
-            property_info += f"\n🏠 PROPIEDADES DISPONIBLES ({len(available_properties)}):\n"
-            for i, prop in enumerate(available_properties[:10], 1):
-                title = prop.get("Title", "Sin título")
-                neighborhood = prop.get("Neighborhood", "")
-                rooms = prop.get("Rooms", "")
-                price = prop.get("Price", "")
-                
-                property_info += f"{i}. {title}"
-                if neighborhood:
-                    property_info += f" - {neighborhood}"
-                if rooms:
-                    property_info += f" - {rooms} amb"
-                if price:
-                    try:
-                        price_val = float(price)
-                        if price_val >= 1000000:
-                            price_str = f"${price_val/1000000:.1f}M"
-                        elif price_val >= 1000:
-                            price_str = f"${int(price_val/1000)}k"
-                        else:
-                            price_str = f"${int(price_val)}"
-                        property_info += f" - {price_str}"
-                    except:
-                        pass
-                property_info += "\n"
+        if current_stage == "CALIFICACION":
+            # Para calificación, necesitamos info de la propiedad y datos faltantes
+            property_id = updated_lead_data.get("PropertyId")
+            if property_id:
+                try:
+                    from services.dynamo import t_props
+                    from models.schemas import dec_to_native
+                    resp = t_props.get_item(Key={"PropertyId": property_id})
+                    if resp.get("Item"):
+                        prop = dec_to_native(resp["Item"])
+                        context_data["property_title"] = prop.get("Title", "Propiedad")
+                except Exception as e:
+                    print(f"Error obteniendo propiedad: {e}")
+                    context_data["property_title"] = "Propiedad confirmada"
             
-            # Determinar respuesta según cantidad de propiedades
-            is_first_message = len(conversation_history) <= 1
-            greeting = "Hola! " if is_first_message else ""
+            # Datos faltantes
+            qual_data = updated_lead_data.get("QualificationData", {})
+            missing_data = stage_manager.get_missing_qualification_data(qual_data)
+            context_data["missing_data"] = missing_data
             
-            if pending_property_id:
-                # Ya hay propiedad confirmada - continuar con precalificación
-                property_info += "\n✅ PROPIEDAD YA CONFIRMADA. Continúa con precalificación usando los datos del lead."
-                property_info += "\nNO preguntes por la propiedad nuevamente. Enfócate en completar datos faltantes para la visita."
-                if not missing_data:
-                    property_info += "\n🚨 OBLIGATORIO: Todos los datos están completos. DEBES preguntar: 'Perfecto! Que día y horario te conviene para la visita?'"
-            elif len(available_properties) == 1:
-                prop = available_properties[0]
-                property_info += f"\n✅ UNA SOLA PROPIEDAD encontrada: {prop.get('Title', 'Sin título')}"
-                
-                # Mostrar información completa de la propiedad y pedir confirmación
-                prop_details = f"\n🏠 INFORMACIÓN DE LA PROPIEDAD:\n"
-                prop_details += f"📍 {prop.get('Title', 'Sin título')}\n"
-                if prop.get('Neighborhood'):
-                    prop_details += f"📍 Ubicación: {prop.get('Neighborhood')}\n"
-                if prop.get('Rooms'):
-                    prop_details += f"🏠 Ambientes: {prop.get('Rooms')}\n"
-                if prop.get('Price'):
-                    try:
-                        price_val = float(prop.get('Price'))
-                        if price_val >= 1000000:
-                            price_str = f"${price_val/1000000:.1f}M"
-                        elif price_val >= 1000:
-                            price_str = f"${int(price_val/1000)}k"
-                        else:
-                            price_str = f"${int(price_val)}"
-                        prop_details += f"💰 Precio: {price_str}\n"
-                    except:
-                        pass
-                if prop.get('URL'):
-                    prop_details += f"🔗 Link: {prop.get('URL')}\n"
-                
-                property_info += prop_details
-                property_info += f"\n🚨 RESPUESTA OBLIGATORIA:"
-                property_info += f"\n'{greeting}Te muestro la propiedad que encontré:\\n"
-                property_info += f"🏠 {prop.get('Title', 'Sin título')}\\n"
-                if prop.get('Neighborhood'):
-                    property_info += f"📍 {prop.get('Neighborhood')}\\n"
-                if prop.get('Rooms'):
-                    property_info += f"🏠 {prop.get('Rooms')} ambientes\\n"
-                if prop.get('Price'):
-                    try:
-                        price_val = float(prop.get('Price'))
-                        if price_val >= 1000000:
-                            price_str = f"${price_val/1000000:.1f}M"
-                        elif price_val >= 1000:
-                            price_str = f"${int(price_val/1000)}k"
-                        else:
-                            price_str = f"${int(price_val)}"
-                        property_info += f"💰 {price_str}\\n"
-                    except:
-                        pass
-                if prop.get('URL'):
-                    property_info += f"🔗 {prop.get('URL')}\\n"
-                property_info += f"\\nEs esta la propiedad que te interesa?'"
-                property_info += "\nNO continúes con precalificación hasta que confirme."
-            else:
-                property_info += "\nCRÍTICO: Hay MÚLTIPLES propiedades. DEBES identificar cuál específicamente busca el cliente."
-                neighborhood = lead_data.get('Neighborhood', 'esa zona')
-                property_info += f"\nRespuesta: '{greeting}Tengo varias propiedades en {neighborhood}. Cuál te interesa? Me podés dar el título o algún detalle específico?'"
-                property_info += "\nNO continúes con precalificación hasta saber la propiedad exacta."
-        else:
-            # No hay propiedades que coincidan
-            neighborhood = lead_data.get("Neighborhood")
-            if neighborhood:
-                if property_detail_requests >= 3:
-                    # Después de 3+ intentos
-                    fallback_properties = get_fallback_properties(lead_data)
-                    if fallback_properties:
-                        property_info += f"\n🔄 FALLBACK: Después de {property_detail_requests} intentos, ofrecer alternativas."
-                        property_info += f"\n🏠 PROPIEDADES ALTERNATIVAS ({len(fallback_properties)}):\n"
-                        for i, prop in enumerate(fallback_properties[:5], 1):
-                            title = prop.get("Title", "Sin título")
-                            prop_neighborhood = prop.get("Neighborhood", "")
-                            rooms = prop.get("Rooms", "")
-                            price = prop.get("Price", "")
-                            
-                            property_info += f"{i}. {title}"
-                            if prop_neighborhood:
-                                property_info += f" - {prop_neighborhood}"
-                            if rooms:
-                                property_info += f" - {rooms} amb"
-                            if price:
-                                try:
-                                    price_val = float(price)
-                                    if price_val >= 1000000:
-                                        price_str = f"${price_val/1000000:.1f}M"
-                                    elif price_val >= 1000:
-                                        price_str = f"${int(price_val/1000)}k"
-                                    else:
-                                        price_str = f"${int(price_val)}"
-                                    property_info += f" - {price_str}"
-                                except:
-                                    pass
-                            property_info += "\n"
-                        property_info += f"\nRespuesta: 'No tenemos esa propiedad específica en {neighborhood}. Te muestro opciones similares:' y luego lista las propiedades."
-                    else:
-                        property_info += f"\n❌ CERRAR: Después de {property_detail_requests} intentos sin éxito."
-                        property_info += f"\nRespuesta: 'Lamentablemente no tenemos propiedades que coincidan con lo que buscás.'"
-                else:
-                    # Primeros intentos - pedir más detalles
-                    property_info += f"\n❌ NO HAY PROPIEDADES en {neighborhood}."
-                    property_info += f"\nRespuesta: 'No tengo propiedades disponibles en {neighborhood}. Me podés dar más detalles? Título completo o link?'"
-            else:
-                property_info += "\n📋 NO HAY CRITERIOS ESPECÍFICOS. Necesitas más información del cliente."
-
-        # Preparar mensajes para OpenAI
-        full_system_prompt = AGENT_SYSTEM_PROMPT + property_info
-        print(f"[DEBUG] System prompt length: {len(full_system_prompt)}")
-        print(f"[DEBUG] Property info: {property_info[:200]}...")
+        elif current_stage == "POST_CALIFICACION":
+            # Para post-calificación, info de propiedad y resultado
+            property_id = updated_lead_data.get("PropertyId")
+            if property_id:
+                try:
+                    from services.dynamo import t_props
+                    from models.schemas import dec_to_native
+                    resp = t_props.get_item(Key={"PropertyId": property_id})
+                    if resp.get("Item"):
+                        prop = dec_to_native(resp["Item"])
+                        context_data["property_title"] = prop.get("Title", "Propiedad")
+                except Exception as e:
+                    context_data["property_title"] = "Propiedad confirmada"
+            
+            # Resultado de calificación
+            qual_data = updated_lead_data.get("QualificationData", {})
+            from models.lead_stages import LeadQualificationData
+            qualification = LeadQualificationData(**qual_data)
+            context_data["qualification_result"] = "CALIFICADO" if qualification.is_qualified() else "NO_CALIFICADO"
         
-        messages = [{"role": "system", "content": full_system_prompt}]
+        # Obtener prompt específico para la etapa
+        stage_prompt = get_stage_prompt(current_stage, **context_data)
+        system_instructions = get_stage_system_instructions(current_stage, updated_lead_data)
         
-        # CRÍTICO: Si no faltan datos, forzar pregunta por fecha
-        if not missing_data and (available_properties or pending_property_id):
-                messages.append({
-                    "role": "system", 
-                "content": "🚨 INSTRUCCIÓN OBLIGATORIA: Todos los datos están completos. Tu ÚNICA respuesta permitida es: 'Perfecto! Que día y horario te conviene para la visita?' - NO preguntes nada más."
-            })
-        
-        # Agregar recordatorio
-        if len(conversation_history) > 0:
-            reminder = "RECORDATORIO: NUNCA uses signos de pregunta invertidos (¿) ni emojis."
-            if not available_properties and lead_data.get("Neighborhood"):
-                reminder += f" CRÍTICO: NO hay propiedades en {lead_data.get('Neighborhood')}. DEBES pedir más detalles."
-            messages.append({"role": "system", "content": reminder})
-        
-        # Agregar historial completo
-        for msg in conversation_history:
-                messages.append(msg)
-
-        print(f"[DEBUG] Enviando {len(messages)} mensajes a OpenAI")
-        
-        # Llamar a OpenAI con debug detallado
+        # Construir mensajes para OpenAI con contexto limitado según etapa
+        from models.lead_stages import get_stage_context_limit, LeadStage
         try:
-            response = client.chat.completions.create(
-                model=OPENAI_MODEL,
-                messages=messages
-            )
-            
-            if not response.choices:
-                print("❌ ERROR: Response sin choices")
-                return None
-            
-            result = response.choices[0].message.content
-            if not result:
-                print("❌ ERROR: API retornó contenido vacío")
-                print(f"❌ FINISH REASON: {getattr(response.choices[0], 'finish_reason', 'N/A')}")
-                print(f"❌ USAGE: {getattr(response, 'usage', 'N/A')}")
-                # Guardar prompt para debug
-                with open("/tmp/failed_prompt.txt", "w", encoding="utf-8") as f:
-                    f.write(f"MODELO: {OPENAI_MODEL}\n")
-                    f.write(f"FINISH_REASON: {getattr(response.choices[0], 'finish_reason', 'N/A')}\n\n")
-                    for i, msg in enumerate(messages):
-                        f.write(f"=== MENSAJE {i+1} ({msg.get('role', 'unknown').upper()}) ===\n")
-                        f.write(f"{msg.get('content', '')}\n\n")
-                print("❌ Prompt guardado en /tmp/failed_prompt.txt")
-                return None
-            
-            return result.strip()
-            
-        except Exception as api_error:
-            print(f"❌ ERROR: Excepción en API call")
-            print(f"❌ TIPO: {type(api_error).__name__}")
-            print(f"❌ MENSAJE: {str(api_error)}")
-            import traceback
-            print(f"❌ STACK TRACE: {traceback.format_exc()}")
+            stage_enum = LeadStage(current_stage)
+            context_limit = get_stage_context_limit(stage_enum)
+        except ValueError:
+            context_limit = 6
+        
+        # Usar solo el contexto necesario según la etapa
+        limited_history = conversation_history[-context_limit:] if conversation_history else []
+        
+        messages = [
+            {"role": "system", "content": stage_prompt},
+            {"role": "system", "content": system_instructions}
+        ]
+        
+        # Agregar historial limitado
+        for msg in limited_history:
+            messages.append(msg)
+
+        print(f"📨 Enviando {len(messages)} mensajes a OpenAI (contexto limitado: {context_limit})")
+        
+        # Llamar a OpenAI
+        response = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=messages,
+        )
+        
+        if not response.choices:
+            print("❌ ERROR: Response sin choices")
+            return None
+        
+        result = response.choices[0].message.content
+        if not result:
+            print("❌ ERROR: API retornó contenido vacío")
             return None
             
+        print(f"✅ Respuesta generada exitosamente para etapa {current_stage}")
+        return result.strip()
                 
     except Exception as e:
-        print(f"❌ ERROR: Excepción general en generate_agent_response")
-        print(f"❌ TIPO: {type(e).__name__}")
-        print(f"❌ MENSAJE: {str(e)}")
+        print(f"❌ ERROR en generate_stage_based_response: {e}")
         import traceback
         print(f"❌ STACK TRACE: {traceback.format_exc()}")
         return None
-
-
