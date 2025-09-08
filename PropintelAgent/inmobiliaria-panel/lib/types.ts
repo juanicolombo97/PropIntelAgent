@@ -2,7 +2,7 @@ export interface Lead {
   LeadId: string;
   FullName?: string;
   Phone?: string;
-  Status: "NUEVO" | "CALIFICANDO" | "CALIFICADO" | "AGENDANDO_VISITA" | "PROCESO_COMPLETADO";
+  Status: "NUEVO" | "CALIFICANDO" | "CALIFICADO" | "AGENDANDO_VISITA" | "PROCESO_COMPLETADO" | "BUSCANDO_PROPIEDAD";
   Stage: "PRECALIFICACION" | "CALIFICACION" | "POST_CALIFICACION" | "FINALIZADO";
   Intent?: string;
   Rooms?: number;

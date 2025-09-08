@@ -60,7 +60,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const Admin = {
   // Leads
-  leadsByStatus: (status: "NUEVO" | "CALIFICANDO" | "CALIFICADO" | "AGENDANDO_VISITA" | "PROCESO_COMPLETADO"): Promise<ApiResponse<Lead>> =>
+  leadsByStatus: (status: "NUEVO" | "CALIFICANDO" | "CALIFICADO" | "AGENDANDO_VISITA" | "PROCESO_COMPLETADO" | "BUSCANDO_PROPIEDAD"): Promise<ApiResponse<Lead>> =>
     req(`/admin/leads?status=${status}`),
     
   getAllLeads: (): Promise<ApiResponse<Lead>> =>
