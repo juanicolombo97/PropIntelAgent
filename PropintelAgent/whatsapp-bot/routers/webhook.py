@@ -100,12 +100,10 @@ def process_lead_message(lead_id: str, message_text: str) -> str:
         if property_from_url and not lead.get("PropertyId"):
             property_id = property_from_url.get("PropertyId")
             print(f"🔗 Propiedad por URL: {property_id}")
-            
-            update_lead_stage_and_status(lead_id, "CALIFICACION", "CALIFICANDO", {"PropertyId": property_id})
-            update_qualification_data(lead_id, {"property_confirmed": True})
-            
+            # No avanzar aún. Guardar como pendiente y pedir confirmación explícita
+            update_lead(lead_id, {"PendingPropertyId": property_id})
             prop_title = property_from_url.get("Title", "Sin título")
-            reply_text = f"Perfecto! Tengo la propiedad: {prop_title}. Ahora necesito hacerte unas preguntas rápidas. Es para vos o para alguien más?"
+            reply_text = f"¿Es esta la propiedad por la que nos escribiste? {prop_title}. Decime 'sí' o 'no'."
             put_message(lead_id, reply_text, direction="out")
             send_whatsapp_message(lead_id, reply_text)
             return reply_text

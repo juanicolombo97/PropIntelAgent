@@ -146,11 +146,15 @@ class StageManager:
         
         # POST-CALIFICACIÓN → FINALIZADO
         elif current_stage == "POST_CALIFICACION":
-            # Si se detecta fecha/hora para visita
+            # Si se detecta fecha/hora para visita SOLO permitir si ya está calificado (status actual ya AGENDANDO_VISITA)
             if any(word in message.lower() for word in ["mañana", "hoy", "lunes", "martes", "miércoles", 
                                                        "jueves", "viernes", "sábado", "domingo", "hs", "am", "pm"]):
-                print("📅 Fecha detectada - manteniendo en POST_CALIFICACION para procesar")
-                return False, current_stage, "AGENDANDO_VISITA"
+                if current_status == "AGENDANDO_VISITA":
+                    print("📅 Fecha detectada y lead calificado - continuar con agendamiento")
+                    return False, current_stage, "AGENDANDO_VISITA"
+                else:
+                    print("⛔ Fecha detectada pero lead NO calificado - no se puede agendar todavía")
+                    return False, current_stage, current_status
         
         # No avanzar por defecto
         return False, current_stage, current_status
@@ -190,11 +194,7 @@ class StageManager:
             # Actualizaciones específicas por etapa
             additional_updates = {}
             
-            if new_stage == "CALIFICACION" and qualification_updates.get("property_confirmed") is None:
-                # Si avanza a calificación por confirmación de propiedad
-                additional_updates["QualificationData"] = current_qual_data
-                additional_updates["QualificationData"]["property_confirmed"] = True
-                update_qualification_data(lead_id, {"property_confirmed": True})
+            # No marcar property_confirmed automáticamente. Debe confirmarse explícitamente y existir PropertyId.
             
             if additional_updates:
                 from services.dynamo import update_lead
