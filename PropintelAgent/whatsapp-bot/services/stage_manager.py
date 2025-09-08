@@ -100,15 +100,21 @@ class StageManager:
             # Verificar confirmación de propiedad
             property_confirmation = self.check_property_confirmation(message)
             if property_confirmation is True:
-                print("✅ Propiedad confirmada - avanzando a CALIFICACION")
-                return True, "CALIFICACION", "CALIFICANDO"
+                # Verificar que realmente tenga una propiedad asignada
+                property_id = lead_data.get("PropertyId")
+                if property_id:
+                    print("✅ Propiedad confirmada y existe en BD - avanzando a CALIFICACION")
+                    return True, "CALIFICACION", "CALIFICANDO"
+                else:
+                    print("❌ Propiedad confirmada pero no existe en BD - mantener en PRECALIFICACION")
+                    return False, current_stage, "BUSCANDO_PROPIEDAD"
             elif property_confirmation is False:
                 print("❌ Propiedad rechazada - mantener en PRECALIFICACION")
                 return False, current_stage, "BUSCANDO_PROPIEDAD"
             
             # Si ya tiene propiedad confirmada en datos anteriores
-            if qual_data.get("property_confirmed", False):
-                print("✅ Propiedad ya confirmada previamente - avanzando a CALIFICACION")
+            if qual_data.get("property_confirmed", False) and lead_data.get("PropertyId"):
+                print("✅ Propiedad ya confirmada previamente y existe en BD - avanzando a CALIFICACION")
                 return True, "CALIFICACION", "CALIFICANDO"
         
         # CALIFICACIÓN → POST-CALIFICACIÓN

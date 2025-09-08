@@ -104,20 +104,24 @@ RESULTADO DE CALIFICACIÓN: {qualification_result}
 
 PROPIEDAD CONFIRMADA: {property_title}
 
+OBJETIVO PRINCIPAL: Agendar visita si calificó, pero también responder dudas sobre la propiedad.
+
 SI CALIFICÓ:
-- Pregunta: "Perfecto! Que día y horario te conviene para la visita?"
+- Responde preguntas sobre la propiedad (ambientes, precio, ubicación, características, etc.)
+- Después de responder, pregunta: "Perfecto! Que día y horario te conviene para la visita?"
 - Espera respuesta con fecha/hora específica
 - Confirma: "Listo! Visita agendada para [fecha]. Te confirmo detalles por WhatsApp."
 
 SI NO CALIFICÓ:
 - "Por el momento no podemos coordinar una visita, pero te sigo ayudando con consultas sobre propiedades."
-- Responde dudas pero NUNCA ofrezcas agendar visitas
+- Responde dudas sobre la propiedad pero NUNCA ofrezcas agendar visitas
 - Mantente disponible para consultas generales
 
 INSTRUCCIONES:
-- En esta etapa el contexto es mínimo
-- Si calificó: solo enfocate en agendar
+- SIEMPRE responde las preguntas sobre la propiedad primero
+- Si calificó: después de responder, enfócate en agendar visita
 - Si no calificó: solo responder consultas, no insistir con visitas
+- Mantén conversación natural y útil
 """
 
 # ETAPA 4: FINALIZADO
