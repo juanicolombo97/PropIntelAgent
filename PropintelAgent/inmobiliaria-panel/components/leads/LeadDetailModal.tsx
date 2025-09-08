@@ -142,6 +142,8 @@ export function LeadDetailModal({ isOpen, onClose, lead }: LeadDetailModalProps)
         return <Badge variant="success" size="sm">Calificado</Badge>;
       case 'AGENDANDO_VISITA':
         return <Badge variant="info" size="sm">Agendando Visita</Badge>;
+      case 'BUSCANDO_PROPIEDAD':
+        return <Badge variant="warning" size="sm">Buscando Propiedad</Badge>;
       case 'PROCESO_COMPLETADO':
         return <Badge variant="default" size="sm">Proceso Completado</Badge>;
       default:

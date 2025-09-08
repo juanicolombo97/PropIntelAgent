@@ -19,6 +19,7 @@ export function LeadsTable({ leads, title, onLeadClick }: LeadsTableProps) {
       CALIFICADO: 'success' as const,
       AGENDANDO_VISITA: 'info' as const,
       PROCESO_COMPLETADO: 'default' as const,
+      BUSCANDO_PROPIEDAD: 'warning' as const,
     };
     return <Badge variant={variants[status as keyof typeof variants] || 'default'}>{status}</Badge>;
   };

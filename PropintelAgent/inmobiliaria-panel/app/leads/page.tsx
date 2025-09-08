@@ -17,7 +17,7 @@ export default function LeadsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'NUEVO' | 'CALIFICANDO' | 'CALIFICADO' | 'AGENDANDO_VISITA' | 'PROCESO_COMPLETADO'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'NUEVO' | 'CALIFICANDO' | 'CALIFICADO' | 'AGENDANDO_VISITA' | 'PROCESO_COMPLETADO' | 'BUSCANDO_PROPIEDAD'>('all');
 
   // Los datos se cargan automáticamente al inicializar la aplicación
   // No necesitamos cargar datos aquí
@@ -44,6 +44,7 @@ export default function LeadsPage() {
     calificado: leads.filter(lead => lead.Status === 'CALIFICADO').length,
     agendando: leads.filter(lead => lead.Status === 'AGENDANDO_VISITA').length,
     completado: leads.filter(lead => lead.Status === 'PROCESO_COMPLETADO').length,
+    buscando: leads.filter(lead => lead.Status === 'BUSCANDO_PROPIEDAD').length,
     avgBudget: leads.length > 0 
       ? Math.round(leads.reduce((sum, lead) => sum + (lead.Budget || 0), 0) / leads.length)
       : 0
@@ -158,6 +159,13 @@ export default function LeadsPage() {
               onClick={() => setFilterStatus('CALIFICADO')}
             >
               Calificados ({stats.calificado})
+            </Button>
+            <Button
+              variant={filterStatus === 'BUSCANDO_PROPIEDAD' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setFilterStatus('BUSCANDO_PROPIEDAD')}
+            >
+              Buscando Propiedad ({stats.buscando})
             </Button>
           </div>
         </div>
