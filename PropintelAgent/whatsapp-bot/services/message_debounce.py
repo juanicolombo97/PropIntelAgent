@@ -19,7 +19,7 @@ PENDING_MESSAGES_TABLE = "PendingMessages"
 t_pending = dynamodb.Table(PENDING_MESSAGES_TABLE)
 
 # Configuración
-DEBOUNCE_SECONDS = 180  # 3 minutos
+DEBOUNCE_SECONDS = 60
 WEBHOOK_URL = "https://rmys43m4av7y4kptnnvacfsmu40olhvq.lambda-url.us-east-2.on.aws/webhook"
 
 def add_message_to_debounce(lead_id: str, message: str) -> bool:

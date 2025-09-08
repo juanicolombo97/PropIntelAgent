@@ -22,8 +22,10 @@ export async function POST(request: NextRequest) {
     // Guardar mensaje del usuario
     addMessage(phone_number, 'user', message);
     
-    // Guardar respuesta del bot
-    addMessage(phone_number, 'assistant', botResponse.reply);
+    // Guardar respuesta del bot solo si hay contenido
+    if (botResponse.reply && botResponse.reply.trim()) {
+      addMessage(phone_number, 'assistant', botResponse.reply);
+    }
     
     // Actualizar información del lead
     updateLeadInfo(phone_number, botResponse.leadInfo);

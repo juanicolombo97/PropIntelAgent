@@ -155,13 +155,16 @@ export default function BotSimulatorPage() {
           if (currentHistoryLength > lastMessageCount) {
             console.log('🆕 Mensajes nuevos detectados:', currentHistoryLength - lastMessageCount);
             
-            // Obtener solo los mensajes nuevos
-            const newMessages = data.history.slice(lastMessageCount).map((msg: any, index: number) => ({
-              id: `new_${Date.now()}_${index}`,
-              content: msg.content,
-              sender: msg.role === 'user' ? 'user' : 'bot',
-              timestamp: new Date()
-            }));
+            // Obtener solo los mensajes nuevos DEL BOT para no duplicar los enviados por el usuario localmente
+            const newMessages = data.history
+              .slice(lastMessageCount)
+              .filter((msg: any) => msg.role === 'assistant')
+              .map((msg: any, index: number) => ({
+                id: `new_${Date.now()}_${index}`,
+                content: msg.content,
+                sender: 'bot',
+                timestamp: new Date()
+              }));
             
             setMessages(prev => {
               console.log('➕ Agregando mensajes nuevos:', newMessages);
@@ -174,9 +177,10 @@ export default function BotSimulatorPage() {
           
           // Solo quitar "Gonzalo está escribiendo" si hay mensajes nuevos del bot
           if (currentHistoryLength > lastMessageCount) {
-            const newMessages = data.history.slice(lastMessageCount);
-            const hasNewBotMessages = newMessages.some((msg: any) => msg.role === 'assistant');
-            
+            const newBotMessages = data.history
+              .slice(lastMessageCount)
+              .filter((msg: any) => msg.role === 'assistant');
+            const hasNewBotMessages = newBotMessages.length > 0;
             if (hasNewBotMessages) {
               console.log('✅ Hay mensajes nuevos del bot, quitando "Gonzalo está escribiendo"');
               setIsBotTyping(false);
@@ -284,6 +288,36 @@ export default function BotSimulatorPage() {
         // Si no hay respuesta, significa que se envió al bot real
         // No mostrar indicador de espera, solo mantener "Gonzalo está escribiendo"
         // setWaitingForBotResponse(true); // Comentado - no mostrar indicador
+        // Quick poll: re-consultar en ~3s para reflejar estado sin refrescar
+        setTimeout(() => {
+          // Llamada silenciosa a historial para empujar cualquier cambio de leadInfo o mensajes del bot si existieran
+          fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`)
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+              if (!data) return;
+              const currentHistoryLength = data.history?.length || 0;
+              if (currentHistoryLength > lastMessageCount) {
+                const newBotMessages = data.history
+                  .slice(lastMessageCount)
+                  .filter((m: any) => m.role === 'assistant')
+                  .map((msg: any, index: number) => ({
+                    id: `qp_${Date.now()}_${index}`,
+                    content: msg.content,
+                    sender: 'bot',
+                    timestamp: new Date()
+                  }));
+                if (newBotMessages.length > 0) {
+                  setMessages(prev => [...prev, ...newBotMessages]);
+                  setLastMessageCount(currentHistoryLength);
+                  setIsBotTyping(false);
+                }
+              }
+              if (data.leadInfo) {
+                setLeadInfo(prev => JSON.stringify(prev) !== JSON.stringify(data.leadInfo) ? data.leadInfo : prev);
+              }
+            })
+            .catch(() => {})
+        }, 3000);
       }
         
       // Actualizar información del lead
