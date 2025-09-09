@@ -105,6 +105,15 @@ export default function BotSimulatorPage() {
         
         if (response.ok) {
           const data = await response.json();
+          console.log('📨 Datos del polling:', { 
+            historyLength: data.history?.length || 0,
+            lastTimestamp: lastMessageTimestamp,
+            history: data.history?.map((msg: any) => ({ 
+              role: msg.role, 
+              content: msg.content?.substring(0, 50), 
+              timestamp: msg.Timestamp 
+            }))
+          });
           
           // Actualizar información del lead si hay cambios
           if (data.leadInfo) {
@@ -124,7 +133,14 @@ export default function BotSimulatorPage() {
               if (!lastMessageTimestamp) return false;
               
               // Solo mensajes más nuevos que el último timestamp conocido
-              return msg.Timestamp && msg.Timestamp > lastMessageTimestamp;
+              return msg.Timestamp && parseInt(msg.Timestamp) > parseInt(lastMessageTimestamp);
+            });
+            
+            console.log('🔍 Filtro de mensajes:', {
+              totalMessages: data.history.length,
+              botMessages: data.history.filter((msg: any) => msg.role === 'assistant').length,
+              lastTimestamp: lastMessageTimestamp,
+              newBotMessages: newBotMessages.length
             });
             
             if (newBotMessages.length > 0) {
@@ -135,13 +151,13 @@ export default function BotSimulatorPage() {
                 id: `bot_${msg.Timestamp}`,
                 content: msg.content,
                 sender: 'bot' as const,
-                timestamp: new Date(msg.Timestamp)
+                timestamp: new Date(parseInt(msg.Timestamp))
               }));
               
               setMessages(prev => [...prev, ...newMessages]);
               
               // Actualizar el último timestamp
-              const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => msg.Timestamp));
+              const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => parseInt(msg.Timestamp)));
               setLastMessageTimestamp(latestTimestamp.toString());
               
               console.log('➕ Agregados', newMessages.length, 'mensajes del bot');

@@ -70,7 +70,8 @@ export async function GET(request: NextRequest) {
           .sort((a: any, b: any) => parseInt(a.Timestamp) - parseInt(b.Timestamp))
           .map((msg: any) => ({
             role: msg.Direction === 'out' ? 'assistant' : 'user',
-            content: msg.Text
+            content: msg.Text,
+            Timestamp: msg.Timestamp
           }));
         console.log('✅ Historial obtenido del bot real:', { 
           phoneNumber, 
