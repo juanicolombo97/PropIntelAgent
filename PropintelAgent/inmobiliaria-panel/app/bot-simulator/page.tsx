@@ -175,7 +175,7 @@ export default function BotSimulatorPage() {
                     sender: 'bot' as const,
                     timestamp: new Date()
                   }))
-                  .filter(newMsg => !existingIds.has(newMsg.id)); // Filtrar duplicados
+                  .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => !existingIds.has(newMsg.id)); // Filtrar duplicados
                 
                 if (newMessages.length > 0) {
                   console.log('➕ Agregando mensajes nuevos del bot:', newMessages);
@@ -330,7 +330,7 @@ export default function BotSimulatorPage() {
                         sender: 'bot' as const,
                         timestamp: new Date()
                       }))
-                      .filter(newMsg => !existingIds.has(newMsg.id)); // Filtrar duplicados
+                      .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => !existingIds.has(newMsg.id)); // Filtrar duplicados
                     
                     if (newMessages.length > 0) {
                       console.log('⚡ Quick poll: Agregando mensajes nuevos del bot:', newMessages);
