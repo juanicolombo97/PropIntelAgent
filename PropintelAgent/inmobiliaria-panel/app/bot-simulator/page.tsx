@@ -50,6 +50,7 @@ export default function BotSimulatorPage() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [isPolling, setIsPolling] = useState(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
+  const [lastMessageTimestamp, setLastMessageTimestamp] = useState<string | null>(null);
   // const [waitingForBotResponse, setWaitingForBotResponse] = useState(false); // Removed - no longer needed
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -108,11 +109,20 @@ export default function BotSimulatorPage() {
           const data = await response.json();
           const currentHistoryLength = data.history?.length || 0;
           
+          // Obtener el último timestamp de los mensajes existentes si no lo tenemos
+          let currentLastTimestamp = lastMessageTimestamp;
+          if (!currentLastTimestamp && data.history && data.history.length > 0) {
+            // Si no tenemos timestamp previo, usar el último mensaje del historial
+            const lastMessage = data.history[data.history.length - 1];
+            currentLastTimestamp = lastMessage.Timestamp;
+            setLastMessageTimestamp(currentLastTimestamp);
+          }
+
           console.log('📨 Datos del polling:', { 
             historyLength: currentHistoryLength, 
             lastMessageCount,
+            lastTimestamp: currentLastTimestamp,
             hasNewMessages: currentHistoryLength > lastMessageCount,
-            // waitingForBot: waitingForBotResponse, // Removed
             isBotTyping: isBotTyping
           });
           
@@ -151,56 +161,64 @@ export default function BotSimulatorPage() {
             });
           }
           
-          // Verificar si hay mensajes nuevos del bot
-          if (currentHistoryLength > lastMessageCount) {
-            console.log('🆕 Mensajes nuevos detectados:', currentHistoryLength - lastMessageCount);
-            
-            // Obtener solo los mensajes nuevos DEL BOT para no duplicar los enviados por el usuario localmente
-            const newBotMessages = data.history
-              .slice(lastMessageCount)
-              .filter((msg: any) => msg.role === 'assistant');
-            
-            if (newBotMessages.length > 0) {
-              console.log('🤖 Mensajes nuevos del bot encontrados:', newBotMessages.length);
+          // Filtrar mensajes nuevos del bot usando timestamp
+          const newBotMessages = data.history
+            .filter((msg: any) => {
+              // Solo mensajes del bot
+              if (msg.role !== 'assistant') return false;
               
-              setMessages(prev => {
-                // Crear un mapa de IDs existentes para evitar duplicados
-                const existingIds = new Set(prev.map(msg => msg.id));
+              // Si no tenemos timestamp previo, no agregar mensajes (evitar duplicados en carga inicial)
+              if (!currentLastTimestamp) return false;
+              
+              // Solo mensajes más nuevos que el último timestamp conocido
+              return msg.Timestamp && msg.Timestamp > currentLastTimestamp;
+            });
+          
+          if (newBotMessages.length > 0) {
+            console.log('🤖 Mensajes nuevos del bot encontrados por timestamp:', newBotMessages.length);
+            console.log('🕒 Timestamps:', newBotMessages.map((msg: any) => ({ content: msg.content.substring(0, 50), timestamp: msg.Timestamp })));
+            
+            setMessages(prev => {
+              // Crear un mapa de contenido + timestamp existentes para evitar duplicados
+              const existingMessageKeys = new Set(
+                prev
+                  .filter(msg => msg.sender === 'bot')
+                  .map(msg => `${msg.content}_${msg.timestamp.getTime()}`)
+              );
+              
+              // Convertir mensajes nuevos a formato local
+              const newMessages = newBotMessages
+                .map((msg: any) => ({
+                  id: `bot_${msg.Timestamp}_${Date.now()}`,
+                  content: msg.content,
+                  sender: 'bot' as const,
+                  timestamp: new Date(msg.Timestamp)
+                }))
+                .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => {
+                  const messageKey = `${newMsg.content}_${newMsg.timestamp.getTime()}`;
+                  return !existingMessageKeys.has(messageKey);
+                });
+              
+              if (newMessages.length > 0) {
+                console.log('➕ Agregando mensajes nuevos del bot:', newMessages);
                 
-                // Convertir mensajes nuevos a formato local
-                const newMessages = newBotMessages
-                  .map((msg: any, index: number) => ({
-                    id: `bot_${Date.now()}_${index}`,
-                    content: msg.content,
-                    sender: 'bot' as const,
-                    timestamp: new Date()
-                  }))
-                  .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => !existingIds.has(newMsg.id)); // Filtrar duplicados
+                // Actualizar el último timestamp conocido
+                const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => msg.Timestamp));
+                setLastMessageTimestamp(latestTimestamp.toString());
                 
-                if (newMessages.length > 0) {
-                  console.log('➕ Agregando mensajes nuevos del bot:', newMessages);
-                  // Agregar al final (los mensajes del bot siempre llegan después)
-                  return [...prev, ...newMessages];
-                }
-                
-                return prev;
-              });
-            }
+                // Agregar al final (los mensajes del bot siempre llegan después)
+                return [...prev, ...newMessages];
+              }
+              
+              return prev;
+            });
             
             // Actualizar el contador de mensajes
             setLastMessageCount(currentHistoryLength);
-          }
-          
-          // Solo quitar "Gonzalo está escribiendo" si hay mensajes nuevos del bot
-          if (currentHistoryLength > lastMessageCount) {
-            const newBotMessages = data.history
-              .slice(lastMessageCount)
-              .filter((msg: any) => msg.role === 'assistant');
-            const hasNewBotMessages = newBotMessages.length > 0;
-            if (hasNewBotMessages) {
-              console.log('✅ Hay mensajes nuevos del bot, quitando "Gonzalo está escribiendo"');
-              setIsBotTyping(false);
-            }
+            
+            // Quitar "Gonzalo está escribiendo" cuando llegan mensajes nuevos
+            console.log('✅ Hay mensajes nuevos del bot, quitando "Gonzalo está escribiendo"');
+            setIsBotTyping(false);
           }
         }
       } catch (error) {
@@ -210,10 +228,10 @@ export default function BotSimulatorPage() {
       }
     };
 
-    // Polling cada 60 segundos (1 minuto) para detectar respuestas del bot real
-    intervalId = setInterval(pollForNewMessages, 60000);
+    // Polling cada 30 segundos para detectar respuestas del bot real
+    intervalId = setInterval(pollForNewMessages, 30000);
     
-    console.log('🔄 Polling iniciado cada 60 segundos para:', phoneNumber, 'Interval ID:', intervalId);
+    console.log('🔄 Polling iniciado cada 30 segundos para:', phoneNumber, 'Interval ID:', intervalId);
     
     // Ejecutar inmediatamente al montar
     pollForNewMessages();
@@ -224,7 +242,7 @@ export default function BotSimulatorPage() {
         clearInterval(intervalId);
       }
     };
-  }, [phoneNumber]); // Solo depende del phoneNumber
+  }, [phoneNumber, lastMessageTimestamp]); // Depende del phoneNumber y lastMessageTimestamp
 
   // Efecto para limpiar conversación cuando cambia el número de teléfono
   useEffect(() => {
@@ -235,6 +253,7 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setCurrentMessage('');
       setLastMessageCount(0);
+      setLastMessageTimestamp(null);
       // setWaitingForBotResponse(false); // Removed
       setIsBotTyping(false);
       
@@ -311,38 +330,61 @@ export default function BotSimulatorPage() {
             .then(r => r.ok ? r.json() : null)
             .then(data => {
               if (!data) return;
-              const currentHistoryLength = data.history?.length || 0;
-              if (currentHistoryLength > lastMessageCount) {
-                const newBotMessages = data.history
-                  .slice(lastMessageCount)
-                  .filter((m: any) => m.role === 'assistant');
+              
+              // Usar el mismo sistema de timestamps que el polling principal
+              const newBotMessages = data.history
+                .filter((msg: any) => {
+                  // Solo mensajes del bot
+                  if (msg.role !== 'assistant') return false;
+                  
+                  // Si no tenemos timestamp previo, no agregar mensajes
+                  if (!lastMessageTimestamp) return false;
+                  
+                  // Solo mensajes más nuevos que el último timestamp conocido
+                  return msg.Timestamp && msg.Timestamp > lastMessageTimestamp;
+                });
                 
-                if (newBotMessages.length > 0) {
-                  setMessages(prev => {
-                    // Crear un mapa de IDs existentes para evitar duplicados
-                    const existingIds = new Set(prev.map(msg => msg.id));
+              if (newBotMessages.length > 0) {
+                console.log('⚡ Quick poll: Mensajes nuevos del bot encontrados por timestamp:', newBotMessages.length);
+                
+                setMessages(prev => {
+                  // Crear un mapa de contenido + timestamp existentes para evitar duplicados
+                  const existingMessageKeys = new Set(
+                    prev
+                      .filter(msg => msg.sender === 'bot')
+                      .map(msg => `${msg.content}_${msg.timestamp.getTime()}`)
+                  );
+                  
+                  // Convertir mensajes nuevos a formato local
+                  const newMessages = newBotMessages
+                    .map((msg: any) => ({
+                      id: `qp_${msg.Timestamp}_${Date.now()}`,
+                      content: msg.content,
+                      sender: 'bot' as const,
+                      timestamp: new Date(msg.Timestamp)
+                    }))
+                    .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => {
+                      const messageKey = `${newMsg.content}_${newMsg.timestamp.getTime()}`;
+                      return !existingMessageKeys.has(messageKey);
+                    });
+                  
+                  if (newMessages.length > 0) {
+                    console.log('⚡ Quick poll: Agregando mensajes nuevos del bot:', newMessages);
                     
-                    // Convertir mensajes nuevos a formato local
-                    const newMessages = newBotMessages
-                      .map((msg: any, index: number) => ({
-                        id: `qp_${Date.now()}_${index}`,
-                        content: msg.content,
-                        sender: 'bot' as const,
-                        timestamp: new Date()
-                      }))
-                      .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => !existingIds.has(newMsg.id)); // Filtrar duplicados
+                    // Actualizar el último timestamp conocido
+                    const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => msg.Timestamp));
+                    setLastMessageTimestamp(latestTimestamp.toString());
                     
-                    if (newMessages.length > 0) {
-                      console.log('⚡ Quick poll: Agregando mensajes nuevos del bot:', newMessages);
-                      return [...prev, ...newMessages];
-                    }
-                    
-                    return prev;
-                  });
-                  setLastMessageCount(currentHistoryLength);
-                  setIsBotTyping(false);
-                }
+                    return [...prev, ...newMessages];
+                  }
+                  
+                  return prev;
+                });
+                
+                setLastMessageCount(data.history?.length || 0);
+                setIsBotTyping(false);
               }
+              
               if (data.leadInfo) {
                 setLeadInfo(prev => JSON.stringify(prev) !== JSON.stringify(data.leadInfo) ? data.leadInfo : prev);
               }
@@ -383,6 +425,7 @@ export default function BotSimulatorPage() {
       setMessages([]);
       setLeadInfo(null);
       setLastMessageCount(0);
+      setLastMessageTimestamp(null);
       // setWaitingForBotResponse(false); // Removed
       setIsBotTyping(false);
     } catch (error) {
@@ -391,6 +434,7 @@ export default function BotSimulatorPage() {
       setMessages([]);
       setLeadInfo(null);
       setLastMessageCount(0);
+      setLastMessageTimestamp(null);
       // setWaitingForBotResponse(false); // Removed
       setIsBotTyping(false);
     }
@@ -456,10 +500,19 @@ export default function BotSimulatorPage() {
       setMessages(historyMessages);
       setLastMessageCount(historyMessages.length);
       
+      // Establecer el último timestamp del historial cargado
+      if (data.history && data.history.length > 0) {
+        const lastMessage = data.history[data.history.length - 1];
+        if (lastMessage.Timestamp) {
+          setLastMessageTimestamp(lastMessage.Timestamp);
+        }
+      }
+      
       console.log('📚 Historial cargado:', {
         phoneNumber: phoneToUse,
         messagesCount: historyMessages.length,
-        lastMessageCount: historyMessages.length
+        lastMessageCount: historyMessages.length,
+        lastTimestamp: data.history && data.history.length > 0 ? data.history[data.history.length - 1].Timestamp : null
       });
       
       if (data.leadInfo) {

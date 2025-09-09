@@ -575,7 +575,7 @@ def get_fallback_properties(lead_data: dict) -> list:
 def generate_stage_based_response(lead_data: dict, conversation_history: list, message: str) -> str:
     """
     Genera respuesta del agente basada en la etapa actual del lead.
-    Usa prompts específicos y contexto optimizado según la etapa.
+    Usa búsqueda robusta de propiedades que SOLO usa datos reales de la BD.
     """
     print(f"🔍 [DEBUG] generate_stage_based_response iniciado")
     print(f"🔍 [DEBUG] lead_data: {lead_data}")
@@ -588,6 +588,7 @@ def generate_stage_based_response(lead_data: dict, conversation_history: list, m
     try:
         from services.stage_prompts import get_stage_prompt, get_stage_system_instructions
         from services.stage_manager import stage_manager
+        from services.property_search import get_property_search_service
         
         # Obtener etapa y estado actual
         current_stage = lead_data.get("Stage", "PRECALIFICACION")
@@ -595,7 +596,11 @@ def generate_stage_based_response(lead_data: dict, conversation_history: list, m
         
         print(f"🎯 Generando respuesta para etapa: {current_stage} - {current_status}")
         
-        # Procesar transición de etapa antes de generar respuesta
+        # MANEJO ESPECIAL PARA PRECALIFICACIÓN - Búsqueda robusta de propiedades
+        if current_stage == "PRECALIFICACION":
+            return handle_precalification_stage(lead_data, message, conversation_history)
+        
+        # Procesar transición de etapa antes de generar respuesta (para otras etapas)
         updated_lead_data = stage_manager.process_stage_transition(
             lead_data.get("LeadId"), lead_data, message, conversation_history
         )
@@ -698,3 +703,89 @@ def generate_stage_based_response(lead_data: dict, conversation_history: list, m
         import traceback
         print(f"❌ STACK TRACE: {traceback.format_exc()}")
         return None
+
+
+def handle_precalification_stage(lead_data: dict, message: str, conversation_history: list) -> str:
+    """
+    Maneja la etapa de PRECALIFICACIÓN con búsqueda robusta de propiedades.
+    SOLO usa propiedades reales de la BD, NUNCA inventa datos.
+    """
+    try:
+        from services.property_search import get_property_search_service
+        from services.dynamo import update_lead
+        
+        lead_id = lead_data.get("LeadId")
+        search_service = get_property_search_service()
+        
+        print(f"🏠 [PRECALIFICACION] Procesando mensaje: {message}")
+        
+        # 1. PRIMERA PRIORIDAD: Buscar por URL si hay una en el mensaje
+        property_from_url = search_service.search_by_url(message)
+        if property_from_url:
+            print(f"🔗 Propiedad encontrada por URL: {property_from_url['Title']}")
+            # Guardar como PropertyId y confirmar
+            update_lead(lead_id, {"PropertyId": property_from_url["PropertyId"]})
+            return f"Perfecto! Vi que te interesa: {property_from_url['Title']} en {property_from_url['Neighborhood']}. Es esta la propiedad por la que consultas?"
+        
+        # 2. SEGUNDA PRIORIDAD: Si ya hay propiedades candidatas guardadas, confirmar selección
+        candidate_properties = lead_data.get("CandidateProperties", [])
+        if candidate_properties:
+            confirmed_property = search_service.confirm_property_selection(candidate_properties, message)
+            if confirmed_property:
+                print(f"✅ Propiedad confirmada: {confirmed_property['Title']}")
+                # Avanzar a CALIFICACIÓN
+                from services.dynamo import update_lead_stage_and_status
+                update_lead_stage_and_status(lead_id, "CALIFICACION", "CALIFICANDO", {
+                    "PropertyId": confirmed_property["PropertyId"],
+                    "CandidateProperties": []  # Limpiar candidatas
+                })
+                return f"Perfecto! Confirmamos {confirmed_property['Title']}. Es para vos o para otra persona?"
+            else:
+                # No confirmó, seguir buscando
+                print("❌ No se confirmó ninguna propiedad, continuando búsqueda")
+        
+        # 3. TERCERA PRIORIDAD: Buscar por criterios
+        properties, search_message = search_service.search_by_criteria(lead_data, message)
+        
+        if len(properties) == 0:
+            # No se encontraron propiedades
+            return search_message
+        
+        elif len(properties) == 1:
+            # Una sola propiedad encontrada - guardar y confirmar
+            prop = properties[0]
+            update_lead(lead_id, {
+                "CandidateProperties": properties,
+                "PropertyId": None  # No confirmar aún
+            })
+            return search_message  # Ya incluye la pregunta de confirmación
+        
+        else:
+            # Múltiples propiedades - guardar candidatas y pedir más detalles
+            update_lead(lead_id, {
+                "CandidateProperties": properties,
+                "PropertyId": None
+            })
+            
+            # Si el usuario pidió explícitamente ver opciones, mostrar lista
+            if any(word in message.lower() for word in ["mostrar", "ver", "opciones", "cuales", "que tienen"]):
+                properties_list = search_service.format_properties_list(properties, max_items=3)
+                return f"{search_message}\n\nAcá tenes las opciones:\n{properties_list}\n\nCual te interesa?"
+            else:
+                return search_message
+        
+        # 4. FALLBACK: Conversación general de precalificación
+        if not any(word in message.lower() for word in ["propiedad", "casa", "depto", "departamento", "ph", "alquil", "compr", "venta"]):
+            # Es el primer mensaje o conversación general
+            if len(conversation_history) <= 1:
+                return "Hola! Soy Gonzalo de Compromiso Inmobiliario. En que te puedo ayudar?"
+            else:
+                return "Para ayudarte mejor, me podes decir que tipo de propiedad buscas y en que zona?"
+        
+        return "No pude identificar una propiedad específica. Me podes dar más detalles como zona, tipo de propiedad o si tenes algún link?"
+        
+    except Exception as e:
+        print(f"❌ ERROR en handle_precalification_stage: {e}")
+        import traceback
+        print(f"❌ STACK TRACE: {traceback.format_exc()}")
+        return "Para ayudarte mejor, me podes decir que propiedad te interesa y en que zona?"

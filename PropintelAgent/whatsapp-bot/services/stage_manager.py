@@ -98,25 +98,32 @@ class StageManager:
         
         # PRECALIFICACIÓN → CALIFICACIÓN
         if current_stage == "PRECALIFICACION":
-            # Verificar confirmación de propiedad
-            property_confirmation = self.check_property_confirmation(message)
-            if property_confirmation is True:
-                # Verificar que realmente tenga una propiedad asignada
-                property_id = lead_data.get("PropertyId")
-                if property_id:
-                    print("✅ Propiedad confirmada y existe en BD - avanzando a CALIFICACION")
-                    return True, "CALIFICACION", "CALIFICANDO"
-                else:
-                    print("❌ Propiedad confirmada pero no existe en BD - mantener en PRECALIFICACION")
-                    return False, current_stage, "BUSCANDO_PROPIEDAD"
-            elif property_confirmation is False:
-                print("❌ Propiedad rechazada - mantener en PRECALIFICACION")
-                return False, current_stage, "BUSCANDO_PROPIEDAD"
+            # CRÍTICO: Solo avanzar a CALIFICACIÓN si hay PropertyId confirmado
+            property_id = lead_data.get("PropertyId")
             
-            # Si ya tiene propiedad confirmada en datos anteriores
-            if qual_data.get("property_confirmed", False) and lead_data.get("PropertyId"):
-                print("✅ Propiedad ya confirmada previamente y existe en BD - avanzando a CALIFICACION")
-                return True, "CALIFICACION", "CALIFICANDO"
+            if property_id:
+                # Verificar que la propiedad realmente existe en la BD
+                try:
+                    from services.dynamo import t_props
+                    from models.schemas import dec_to_native
+                    resp = t_props.get_item(Key={"PropertyId": property_id})
+                    if resp.get("Item"):
+                        print("✅ PropertyId confirmado y existe en BD - avanzando a CALIFICACION")
+                        # Marcar property_confirmed en qualification_data
+                        return True, "CALIFICACION", "CALIFICANDO"
+                    else:
+                        print("❌ PropertyId no existe en BD - limpiar y mantener en PRECALIFICACION")
+                        # Limpiar PropertyId inválido
+                        from services.dynamo import update_lead
+                        update_lead(lead_data.get("LeadId"), {"PropertyId": None})
+                        return False, current_stage, "BUSCANDO_PROPIEDAD"
+                except Exception as e:
+                    print(f"❌ Error verificando PropertyId: {e}")
+                    return False, current_stage, "BUSCANDO_PROPIEDAD"
+            
+            # Si no hay PropertyId, mantener en PRECALIFICACION
+            print("⏳ Sin PropertyId confirmado - mantener en PRECALIFICACION")
+            return False, current_stage, "BUSCANDO_PROPIEDAD"
         
         # CALIFICACIÓN → POST-CALIFICACIÓN
         elif current_stage == "CALIFICACION":
@@ -195,7 +202,13 @@ class StageManager:
             # Actualizaciones específicas por etapa
             additional_updates = {}
             
-            # No marcar property_confirmed automáticamente. Debe confirmarse explícitamente y existir PropertyId.
+            # Si avanzó a CALIFICACION, marcar property_confirmed automáticamente
+            if new_stage == "CALIFICACION" and lead_data.get("PropertyId"):
+                qualification_updates = {"property_confirmed": True}
+                update_qualification_data(lead_id, qualification_updates)
+                current_qual_data.update(qualification_updates)
+                lead_data["QualificationData"] = current_qual_data
+                print("✅ Marcado property_confirmed=True al avanzar a CALIFICACION")
             
             if additional_updates:
                 from services.dynamo import update_lead

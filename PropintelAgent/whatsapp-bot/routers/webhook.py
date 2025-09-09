@@ -95,15 +95,15 @@ def process_lead_message(lead_id: str, message_text: str) -> str:
                     lead[k] = v
                 print(f"📝 Datos actualizados: {update_data}")
         
-        # 3. FLUJO ESPECIAL: URL de propiedad detectada
+        # 3. FLUJO ESPECIAL: URL de propiedad detectada (mantener para compatibilidad)
         property_from_url = get_property_by_url(message_text)
-        if property_from_url and not lead.get("PropertyId"):
+        if property_from_url and not lead.get("PropertyId") and lead.get("Stage") != "PRECALIFICACION":
             property_id = property_from_url.get("PropertyId")
-            print(f"🔗 Propiedad por URL: {property_id}")
-            # No avanzar aún. Guardar como pendiente y pedir confirmación explícita
-            update_lead(lead_id, {"PendingPropertyId": property_id})
+            print(f"🔗 Propiedad por URL (flujo legacy): {property_id}")
+            # Solo usar este flujo si NO está en PRECALIFICACION (donde se maneja mejor)
+            update_lead(lead_id, {"PropertyId": property_id})
             prop_title = property_from_url.get("Title", "Sin título")
-            reply_text = f"¿Es esta la propiedad por la que nos escribiste? {prop_title}. Decime 'sí' o 'no'."
+            reply_text = f"Perfecto! Vi que te interesa: {prop_title}. Es esta la propiedad por la que consultas?"
             put_message(lead_id, reply_text, direction="out")
             send_whatsapp_message(lead_id, reply_text)
             return reply_text
