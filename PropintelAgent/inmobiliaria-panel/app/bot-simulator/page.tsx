@@ -41,7 +41,6 @@ export default function BotSimulatorPage() {
   const [currentMessage, setCurrentMessage] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isBotTyping, setIsBotTyping] = useState(false);
   const [leadInfo, setLeadInfo] = useState<LeadInfo | null>(null);
   const [existingLeads, setExistingLeads] = useState<any[]>([]);
   const [showLeadSelector, setShowLeadSelector] = useState(false);
@@ -51,7 +50,6 @@ export default function BotSimulatorPage() {
   const [isPolling, setIsPolling] = useState(false);
   const [lastMessageCount, setLastMessageCount] = useState(0);
   const [lastMessageTimestamp, setLastMessageTimestamp] = useState<string | null>(null);
-  // const [waitingForBotResponse, setWaitingForBotResponse] = useState(false); // Removed - no longer needed
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const showLoading = (message: string) => {
@@ -93,9 +91,8 @@ export default function BotSimulatorPage() {
     loadExistingLeads(false);
   }, []);
 
-  // Polling para verificar mensajes nuevos del bot
+  // Polling simple cada 30 segundos para verificar mensajes nuevos del bot
   useEffect(() => {
-    console.log('🔄 useEffect de polling ejecutado para:', phoneNumber);
     if (!phoneNumber) return;
 
     let intervalId: NodeJS.Timeout;
@@ -103,122 +100,52 @@ export default function BotSimulatorPage() {
     const pollForNewMessages = async () => {
       try {
         setIsPolling(true);
-        console.log('🔄 Polling para mensajes nuevos...', phoneNumber, 'Timestamp:', new Date().toLocaleTimeString());
+        console.log('🔄 Polling para mensajes nuevos...', phoneNumber);
         const response = await fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`);
+        
         if (response.ok) {
           const data = await response.json();
-          const currentHistoryLength = data.history?.length || 0;
-          
-          // Obtener el último timestamp de los mensajes existentes si no lo tenemos
-          let currentLastTimestamp = lastMessageTimestamp;
-          if (!currentLastTimestamp && data.history && data.history.length > 0) {
-            // Si no tenemos timestamp previo, usar el último mensaje del historial
-            const lastMessage = data.history[data.history.length - 1];
-            currentLastTimestamp = lastMessage.Timestamp;
-            setLastMessageTimestamp(currentLastTimestamp);
-          }
-
-          console.log('📨 Datos del polling:', { 
-            historyLength: currentHistoryLength, 
-            lastMessageCount,
-            lastTimestamp: currentLastTimestamp,
-            hasNewMessages: currentHistoryLength > lastMessageCount,
-            isBotTyping: isBotTyping
-          });
           
           // Actualizar información del lead si hay cambios
           if (data.leadInfo) {
             setLeadInfo(prevLeadInfo => {
-              // Comparar campos específicos para detectar cambios
-              const hasChanges = !prevLeadInfo || 
-                prevLeadInfo.Status !== data.leadInfo.Status ||
-                prevLeadInfo.Stage !== data.leadInfo.Stage ||
-                prevLeadInfo.Intent !== data.leadInfo.Intent ||
-                prevLeadInfo.Neighborhood !== data.leadInfo.Neighborhood ||
-                prevLeadInfo.Rooms !== data.leadInfo.Rooms ||
-                prevLeadInfo.Budget !== data.leadInfo.Budget ||
-                prevLeadInfo.PropertyId !== data.leadInfo.PropertyId ||
-                JSON.stringify(prevLeadInfo.QualificationData) !== JSON.stringify(data.leadInfo.QualificationData);
-              
-              if (hasChanges) {
-                console.log('📊 Lead info actualizada:', {
-                  anterior: prevLeadInfo,
-                  nueva: data.leadInfo,
-                  cambios: {
-                    Status: prevLeadInfo?.Status !== data.leadInfo.Status,
-                    Stage: prevLeadInfo?.Stage !== data.leadInfo.Stage,
-                    Intent: prevLeadInfo?.Intent !== data.leadInfo.Intent,
-                    Neighborhood: prevLeadInfo?.Neighborhood !== data.leadInfo.Neighborhood,
-                    Rooms: prevLeadInfo?.Rooms !== data.leadInfo.Rooms,
-                    Budget: prevLeadInfo?.Budget !== data.leadInfo.Budget,
-                    PropertyId: prevLeadInfo?.PropertyId !== data.leadInfo.PropertyId,
-                    QualificationData: JSON.stringify(prevLeadInfo?.QualificationData) !== JSON.stringify(data.leadInfo.QualificationData)
-                  }
-                });
-                return data.leadInfo;
-              }
-              return prevLeadInfo;
+              const hasChanges = JSON.stringify(prevLeadInfo) !== JSON.stringify(data.leadInfo);
+              return hasChanges ? data.leadInfo : prevLeadInfo;
             });
           }
           
-          // Filtrar mensajes nuevos del bot usando timestamp
-          const newBotMessages = data.history
-            .filter((msg: any) => {
+          // Buscar mensajes nuevos del bot usando timestamp
+          if (data.history && data.history.length > 0) {
+            const newBotMessages = data.history.filter((msg: any) => {
               // Solo mensajes del bot
               if (msg.role !== 'assistant') return false;
               
-              // Si no tenemos timestamp previo, no agregar mensajes (evitar duplicados en carga inicial)
-              if (!currentLastTimestamp) return false;
+              // Si no tenemos timestamp previo, no agregar mensajes
+              if (!lastMessageTimestamp) return false;
               
               // Solo mensajes más nuevos que el último timestamp conocido
-              return msg.Timestamp && msg.Timestamp > currentLastTimestamp;
-            });
-          
-          if (newBotMessages.length > 0) {
-            console.log('🤖 Mensajes nuevos del bot encontrados por timestamp:', newBotMessages.length);
-            console.log('🕒 Timestamps:', newBotMessages.map((msg: any) => ({ content: msg.content.substring(0, 50), timestamp: msg.Timestamp })));
-            
-            setMessages(prev => {
-              // Crear un mapa de contenido + timestamp existentes para evitar duplicados
-              const existingMessageKeys = new Set(
-                prev
-                  .filter(msg => msg.sender === 'bot')
-                  .map(msg => `${msg.content}_${msg.timestamp.getTime()}`)
-              );
-              
-              // Convertir mensajes nuevos a formato local
-              const newMessages = newBotMessages
-                .map((msg: any) => ({
-                  id: `bot_${msg.Timestamp}_${Date.now()}`,
-                  content: msg.content,
-                  sender: 'bot' as const,
-                  timestamp: new Date(msg.Timestamp)
-                }))
-                .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => {
-                  const messageKey = `${newMsg.content}_${newMsg.timestamp.getTime()}`;
-                  return !existingMessageKeys.has(messageKey);
-                });
-              
-              if (newMessages.length > 0) {
-                console.log('➕ Agregando mensajes nuevos del bot:', newMessages);
-                
-                // Actualizar el último timestamp conocido
-                const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => msg.Timestamp));
-                setLastMessageTimestamp(latestTimestamp.toString());
-                
-                // Agregar al final (los mensajes del bot siempre llegan después)
-                return [...prev, ...newMessages];
-              }
-              
-              return prev;
+              return msg.Timestamp && msg.Timestamp > lastMessageTimestamp;
             });
             
-            // Actualizar el contador de mensajes
-            setLastMessageCount(currentHistoryLength);
-            
-            // Quitar "Gonzalo está escribiendo" cuando llegan mensajes nuevos
-            console.log('✅ Hay mensajes nuevos del bot, quitando "Gonzalo está escribiendo"');
-            setIsBotTyping(false);
+            if (newBotMessages.length > 0) {
+              console.log('🤖 Encontrados', newBotMessages.length, 'mensajes nuevos del bot');
+              
+              // Agregar mensajes nuevos
+              const newMessages = newBotMessages.map((msg: any) => ({
+                id: `bot_${msg.Timestamp}`,
+                content: msg.content,
+                sender: 'bot' as const,
+                timestamp: new Date(msg.Timestamp)
+              }));
+              
+              setMessages(prev => [...prev, ...newMessages]);
+              
+              // Actualizar el último timestamp
+              const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => msg.Timestamp));
+              setLastMessageTimestamp(latestTimestamp.toString());
+              
+              console.log('➕ Agregados', newMessages.length, 'mensajes del bot');
+            }
           }
         }
       } catch (error) {
@@ -228,13 +155,9 @@ export default function BotSimulatorPage() {
       }
     };
 
-    // Polling cada 30 segundos para detectar respuestas del bot real
+    // Polling cada 30 segundos
     intervalId = setInterval(pollForNewMessages, 30000);
-    
-    console.log('🔄 Polling iniciado cada 30 segundos para:', phoneNumber, 'Interval ID:', intervalId);
-    
-    // Ejecutar inmediatamente al montar
-    pollForNewMessages();
+    console.log('🔄 Polling iniciado cada 30 segundos para:', phoneNumber);
     
     return () => {
       if (intervalId) {
@@ -242,7 +165,7 @@ export default function BotSimulatorPage() {
         clearInterval(intervalId);
       }
     };
-  }, [phoneNumber, lastMessageTimestamp]); // Depende del phoneNumber y lastMessageTimestamp
+  }, [phoneNumber, lastMessageTimestamp]);
 
   // Efecto para limpiar conversación cuando cambia el número de teléfono
   useEffect(() => {
@@ -254,8 +177,6 @@ export default function BotSimulatorPage() {
       setCurrentMessage('');
       setLastMessageCount(0);
       setLastMessageTimestamp(null);
-      // setWaitingForBotResponse(false); // Removed
-      setIsBotTyping(false);
       
       // Mostrar notificación
       setShowNotification(true);
@@ -284,12 +205,8 @@ export default function BotSimulatorPage() {
     setMessages(prev => [...prev, userMessage]);
     const messageToSend = currentMessage;
     setCurrentMessage('');
-    
-    // Mostrar "Gonzalo está escribiendo" inmediatamente al enviar mensaje
-    setIsBotTyping(true);
 
     try {
-      
       // Llamar al endpoint del bot
       const response = await fetch('/api/bot/test-message', {
         method: 'POST',
@@ -308,7 +225,7 @@ export default function BotSimulatorPage() {
 
       const data = await response.json();
 
-      // Solo agregar mensaje del bot si hay contenido
+      // Solo agregar mensaje del bot si hay contenido (respuesta inmediata)
       if (data.response && data.response.trim()) {
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -318,79 +235,6 @@ export default function BotSimulatorPage() {
         };
 
         setMessages(prev => [...prev, botMessage]);
-        setIsBotTyping(false); // El bot ya respondió
-      } else {
-        // Si no hay respuesta, significa que se envió al bot real
-        // No mostrar indicador de espera, solo mantener "Gonzalo está escribiendo"
-        // setWaitingForBotResponse(true); // Comentado - no mostrar indicador
-        // Quick poll: re-consultar en ~3s para reflejar estado sin refrescar
-        setTimeout(() => {
-          // Llamada silenciosa a historial para empujar cualquier cambio de leadInfo o mensajes del bot si existieran
-          fetch(`/api/bot/conversation-history?phone_number=${phoneNumber}`)
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-              if (!data) return;
-              
-              // Usar el mismo sistema de timestamps que el polling principal
-              const newBotMessages = data.history
-                .filter((msg: any) => {
-                  // Solo mensajes del bot
-                  if (msg.role !== 'assistant') return false;
-                  
-                  // Si no tenemos timestamp previo, no agregar mensajes
-                  if (!lastMessageTimestamp) return false;
-                  
-                  // Solo mensajes más nuevos que el último timestamp conocido
-                  return msg.Timestamp && msg.Timestamp > lastMessageTimestamp;
-                });
-                
-              if (newBotMessages.length > 0) {
-                console.log('⚡ Quick poll: Mensajes nuevos del bot encontrados por timestamp:', newBotMessages.length);
-                
-                setMessages(prev => {
-                  // Crear un mapa de contenido + timestamp existentes para evitar duplicados
-                  const existingMessageKeys = new Set(
-                    prev
-                      .filter(msg => msg.sender === 'bot')
-                      .map(msg => `${msg.content}_${msg.timestamp.getTime()}`)
-                  );
-                  
-                  // Convertir mensajes nuevos a formato local
-                  const newMessages = newBotMessages
-                    .map((msg: any) => ({
-                      id: `qp_${msg.Timestamp}_${Date.now()}`,
-                      content: msg.content,
-                      sender: 'bot' as const,
-                      timestamp: new Date(msg.Timestamp)
-                    }))
-                    .filter((newMsg: { id: string; content: string; sender: 'bot'; timestamp: Date }) => {
-                      const messageKey = `${newMsg.content}_${newMsg.timestamp.getTime()}`;
-                      return !existingMessageKeys.has(messageKey);
-                    });
-                  
-                  if (newMessages.length > 0) {
-                    console.log('⚡ Quick poll: Agregando mensajes nuevos del bot:', newMessages);
-                    
-                    // Actualizar el último timestamp conocido
-                    const latestTimestamp = Math.max(...newBotMessages.map((msg: any) => msg.Timestamp));
-                    setLastMessageTimestamp(latestTimestamp.toString());
-                    
-                    return [...prev, ...newMessages];
-                  }
-                  
-                  return prev;
-                });
-                
-                setLastMessageCount(data.history?.length || 0);
-                setIsBotTyping(false);
-              }
-              
-              if (data.leadInfo) {
-                setLeadInfo(prev => JSON.stringify(prev) !== JSON.stringify(data.leadInfo) ? data.leadInfo : prev);
-              }
-            })
-            .catch(() => {})
-        }, 3000);
       }
         
       // Actualizar información del lead
@@ -398,9 +242,6 @@ export default function BotSimulatorPage() {
         console.log('📊 Lead info actualizada desde sendMessage:', data.leadInfo);
         setLeadInfo(data.leadInfo);
       }
-
-      // No cargar leads existentes después de enviar mensaje para evitar modal
-      // loadExistingLeads();
 
     } catch (error) {
       console.error('Error:', error);
@@ -426,8 +267,6 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setLastMessageCount(0);
       setLastMessageTimestamp(null);
-      // setWaitingForBotResponse(false); // Removed
-      setIsBotTyping(false);
     } catch (error) {
       console.error('Error al limpiar conversación:', error);
       // Limpiar en el cliente aunque falle el servidor
@@ -435,8 +274,6 @@ export default function BotSimulatorPage() {
       setLeadInfo(null);
       setLastMessageCount(0);
       setLastMessageTimestamp(null);
-      // setWaitingForBotResponse(false); // Removed
-      setIsBotTyping(false);
     }
   };
 
@@ -590,14 +427,8 @@ export default function BotSimulatorPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900 text-lg">Gonzalo</h3>
-                    <p className="text-sm text-slate-600 flex items-center gap-2">
+                    <p className="text-sm text-slate-600">
                       Agente Inmobiliario • En línea
-                      {isPolling && (
-                        <span className="flex items-center gap-1 text-blue-600">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                          <span className="text-xs">Verificando mensajes...</span>
-                        </span>
-                      )}
                     </p>
                   </div>
                 </div>
@@ -657,21 +488,6 @@ export default function BotSimulatorPage() {
                     </div>
                   ))}
                   
-                  {/* Indicador de que el bot está escribiendo */}
-                  {isBotTyping && (
-                    <div className="flex justify-start mb-3">
-                      <div className="max-w-[75%] px-4 py-3 rounded-2xl bg-white border border-slate-200 text-slate-900 shadow-sm rounded-bl-md">
-                        <div className="flex items-center space-x-2">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                          <span className="text-xs text-slate-500">Gonzalo está escribiendo...</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                 </>
               )}
