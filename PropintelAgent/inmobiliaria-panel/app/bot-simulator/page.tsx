@@ -156,20 +156,36 @@ export default function BotSimulatorPage() {
             console.log('🆕 Mensajes nuevos detectados:', currentHistoryLength - lastMessageCount);
             
             // Obtener solo los mensajes nuevos DEL BOT para no duplicar los enviados por el usuario localmente
-            const newMessages = data.history
+            const newBotMessages = data.history
               .slice(lastMessageCount)
-              .filter((msg: any) => msg.role === 'assistant')
-              .map((msg: any, index: number) => ({
-                id: `new_${Date.now()}_${index}`,
-                content: msg.content,
-                sender: 'bot',
-                timestamp: new Date()
-              }));
+              .filter((msg: any) => msg.role === 'assistant');
             
-            setMessages(prev => {
-              console.log('➕ Agregando mensajes nuevos:', newMessages);
-              return [...prev, ...newMessages];
-            });
+            if (newBotMessages.length > 0) {
+              console.log('🤖 Mensajes nuevos del bot encontrados:', newBotMessages.length);
+              
+              setMessages(prev => {
+                // Crear un mapa de IDs existentes para evitar duplicados
+                const existingIds = new Set(prev.map(msg => msg.id));
+                
+                // Convertir mensajes nuevos a formato local
+                const newMessages = newBotMessages
+                  .map((msg: any, index: number) => ({
+                    id: `bot_${Date.now()}_${index}`,
+                    content: msg.content,
+                    sender: 'bot' as const,
+                    timestamp: new Date()
+                  }))
+                  .filter(newMsg => !existingIds.has(newMsg.id)); // Filtrar duplicados
+                
+                if (newMessages.length > 0) {
+                  console.log('➕ Agregando mensajes nuevos del bot:', newMessages);
+                  // Agregar al final (los mensajes del bot siempre llegan después)
+                  return [...prev, ...newMessages];
+                }
+                
+                return prev;
+              });
+            }
             
             // Actualizar el contador de mensajes
             setLastMessageCount(currentHistoryLength);
@@ -299,15 +315,30 @@ export default function BotSimulatorPage() {
               if (currentHistoryLength > lastMessageCount) {
                 const newBotMessages = data.history
                   .slice(lastMessageCount)
-                  .filter((m: any) => m.role === 'assistant')
-                  .map((msg: any, index: number) => ({
-                    id: `qp_${Date.now()}_${index}`,
-                    content: msg.content,
-                    sender: 'bot',
-                    timestamp: new Date()
-                  }));
+                  .filter((m: any) => m.role === 'assistant');
+                
                 if (newBotMessages.length > 0) {
-                  setMessages(prev => [...prev, ...newBotMessages]);
+                  setMessages(prev => {
+                    // Crear un mapa de IDs existentes para evitar duplicados
+                    const existingIds = new Set(prev.map(msg => msg.id));
+                    
+                    // Convertir mensajes nuevos a formato local
+                    const newMessages = newBotMessages
+                      .map((msg: any, index: number) => ({
+                        id: `qp_${Date.now()}_${index}`,
+                        content: msg.content,
+                        sender: 'bot' as const,
+                        timestamp: new Date()
+                      }))
+                      .filter(newMsg => !existingIds.has(newMsg.id)); // Filtrar duplicados
+                    
+                    if (newMessages.length > 0) {
+                      console.log('⚡ Quick poll: Agregando mensajes nuevos del bot:', newMessages);
+                      return [...prev, ...newMessages];
+                    }
+                    
+                    return prev;
+                  });
                   setLastMessageCount(currentHistoryLength);
                   setIsBotTyping(false);
                 }

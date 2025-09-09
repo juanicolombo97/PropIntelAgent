@@ -250,21 +250,22 @@ def get_pending_messages(lead_id: str, _: bool = Depends(verify_api_key)):
         if not pending_table_name:
             return {"hasPendingMessages": False, "message": "Debounce system not configured"}
         
-        # Importar la tabla de mensajes pendientes
-        from services.dynamo import get_dynamo_resource
-        dynamodb = get_dynamo_resource()
+        # Acceder al recurso de DynamoDB localmente (igual que en services/dynamo.py)
+        import boto3
+        AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
+        dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
         pending_table = dynamodb.Table(pending_table_name)
         
         # Buscar mensajes pendientes para este lead
         response = pending_table.query(
             KeyConditionExpression=Key('LeadId').eq(lead_id)
         )
-        
-        has_pending = len(response.get('Items', [])) > 0
+        items = response.get('Items', [])
+        has_pending = len(items) > 0
         
         return {
             "hasPendingMessages": has_pending,
-            "count": len(response.get('Items', [])),
+            "count": len(items),
             "lead_id": lead_id
         }
         

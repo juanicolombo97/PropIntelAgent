@@ -288,6 +288,36 @@ Convertí montos: 150k=150000, 1.5M=1500000. Solo JSON:"""
     
     return result
 
+def analyze_qualification_ai(message_text: str, conversation_history: list) -> dict:
+    """
+    Extrae señales de calificación usando OpenAI (multilenguaje y robusto).
+    Devuelve dict con keys de QualificationData.
+    """
+    try:
+        import json
+        global client
+        if client is None:
+            return {}
+        prompt = (
+            "Analizá el siguiente mensaje de un lead inmobiliario y devolvé JSON con estas claves booleanas: "
+            "buyer_confirmed, motive_confirmed, financing_confirmed, timeline_confirmed, ready_to_close, "
+            "needs_to_sell, has_preapproval, decision_maker. Si no hay evidencia, usar false. Solo JSON."
+        )
+        messages = [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Mensaje: {message_text}"},
+        ]
+        resp = client.chat.completions.create(
+            model=OPENAI_MODEL,
+            messages=messages,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(resp.choices[0].message.content or "{}")
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        print(f"[AI][analyze_qualification_ai][ERROR] {e}")
+        return {}
+
 
 
 def parse_visit_datetime(text: str) -> dict:

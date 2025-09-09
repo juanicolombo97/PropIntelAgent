@@ -21,44 +21,45 @@ class StageManager:
         """
         Analiza el mensaje del usuario para extraer datos de calificación
         """
+        # Priorizar extracción con IA (multilenguaje y robusta)
+        try:
+            from services.ai import analyze_qualification_ai
+            ai_updates = analyze_qualification_ai(message, conversation_history)
+            if isinstance(ai_updates, dict) and ai_updates:
+                return ai_updates
+        except Exception as _:
+            pass
+
+        # Fallback basado en reglas simples
         message_lower = message.lower()
-        updates = {}
-        
-        # 1. Comprador confirmado
+        updates: Dict[str, Any] = {}
+
         buyer_keywords = ["para mi", "para mí", "es mío", "para mia", "mio", "mía", "soy yo", "es para mi"]
         if any(keyword in message_lower for keyword in buyer_keywords):
             updates["buyer_confirmed"] = True
             updates["decision_maker"] = True
-        
-        # 2. Motivo confirmado  
+
         mudanza_keywords = ["mudanza", "mudarme", "vivir", "casa nueva"]
         inversion_keywords = ["inversión", "invertir", "inversion", "inversor", "renta", "alquiler"]
-        if any(keyword in message_lower for keyword in mudanza_keywords):
+        if any(keyword in message_lower for keyword in mudanza_keywords) or any(keyword in message_lower for keyword in inversion_keywords):
             updates["motive_confirmed"] = True
-        elif any(keyword in message_lower for keyword in inversion_keywords):
-            updates["motive_confirmed"] = True
-        
-        # 3. Financiación confirmada
+
         financing_keywords = ["ahorro", "efectivo", "tengo", "crédito", "banco", "preaprobado", "hipotecario"]
         if any(keyword in message_lower for keyword in financing_keywords):
             updates["financing_confirmed"] = True
-            
-        # Detectar si necesita vender
+
         sell_keywords = ["vender", "vendo", "tengo que vender", "necesito vender"]
         if any(keyword in message_lower for keyword in sell_keywords):
             updates["needs_to_sell"] = True
-        
-        # 4. Timeline confirmado (implícito si menciona urgencia)
+
         timeline_keywords = ["pronto", "rápido", "urgente", "ya", "este mes", "próximo mes"]
         if any(keyword in message_lower for keyword in timeline_keywords):
             updates["timeline_confirmed"] = True
-        
-        # 5. Listo para cerrar
-        ready_keywords = ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar", 
-                         "quiero comprar", "quiero alquilar", "me interesa", "vamos", "dale"]
+
+        ready_keywords = ["puedo avanzar", "si me gusta", "estoy listo", "podemos coordinar", "quiero comprar", "quiero alquilar", "me interesa", "vamos", "dale"]
         if any(keyword in message_lower for keyword in ready_keywords):
             updates["ready_to_close"] = True
-        
+
         return updates
     
     def check_property_confirmation(self, message: str) -> Optional[bool]:
